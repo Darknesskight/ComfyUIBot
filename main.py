@@ -1,38 +1,50 @@
-import os
-import uuid
-from comfy_api import ComfyApi, ComfyWebsocket
-from settings import Settings
-import discord
-import sqlite3
-from job_db import JobDB
-from dotenv import load_dotenv
-
-load_dotenv()
-
-server_ip = os.getenv("COMFY_IP")
-client_id = str(uuid.uuid4())
-
-comfy_api = ComfyApi(server_ip, client_id)
-comfy_websocket = ComfyWebsocket(server_ip, client_id)
-job_db = JobDB()
-
-settings = Settings(comfy_api)
-conn = sqlite3.connect("job.db")
-
-comfy_websocket.start()
-settings.load_settings()
-
-# Delayed loading so that it gets the latest settings from Comfy to use in
-# the select decorators.
-# TODO: Look into a better way to do this.
+from settings import bot_token, set_comfy_settings, server_ip, client_id
+import threading
 from comfy_cog import ComfyCog, ComfySDView, ComfySDXLView
+from comfy_api import get_system_info
+from comfy_websocket import wsrun
+from job_db import init_db
+import discord
+import websockets
+import asyncio
 
-bot = discord.Bot()
 
-@bot.event
-async def on_ready():
-    bot.add_view(ComfySDView(comfy_api, comfy_websocket, job_db))
-    bot.add_view(ComfySDXLView(comfy_api, comfy_websocket, job_db))
+uri=f"ws://{server_ip}/ws?clientId={client_id}"
 
-bot.add_cog(ComfyCog(bot, settings, comfy_api, comfy_websocket, job_db))
-bot.run(os.getenv("BOT_TOKEN"))
+
+
+ # Starts receive things, not only once
+
+
+# if __name__ == "__main__":
+#     open_connection()
+#     init_db()
+#     set_comfy_settings(get_system_info())
+
+#     asyncio.create_task(test())
+
+#     bot = discord.Bot()
+
+#     @bot.event
+#     async def on_ready():
+#         bot.add_view(ComfySDView())
+#         bot.add_view(ComfySDXLView())
+
+#     bot.add_cog(ComfyCog())
+#     bot.run(bot_token)
+
+if __name__ == "__main__":
+    init_db()
+    set_comfy_settings(get_system_info())
+
+    bot = discord.Bot()
+
+    asyncio.get_event_loop().create_task(wsrun())
+
+    @bot.event
+    async def on_ready():
+        bot.add_view(ComfySDView())
+        bot.add_view(ComfySDXLView())
+
+    bot.add_cog(ComfyCog())
+    bot.run(bot_token, )

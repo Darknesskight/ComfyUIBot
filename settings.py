@@ -1,6 +1,15 @@
-from comfy_api import ComfyApi
 from typing import List
 from discord import OptionChoice, SelectOption
+from dotenv import load_dotenv
+import jinja2
+import os
+import uuid
+
+load_dotenv()
+
+server_ip = os.getenv("COMFY_IP")
+client_id = str(uuid.uuid4())
+bot_token = os.getenv("BOT_TOKEN")
 
 sd_models: List[OptionChoice] = []
 sdxl_models: List[OptionChoice] = []
@@ -18,38 +27,34 @@ default_sdxl_model = "sdxl-1.0\\sdxlUnstableDiffusers_v5UnchainedSlayer.safetens
 default_steps = 20
 default_cfg = 8
 
+templateLoader = jinja2.FileSystemLoader(searchpath="./templates")
+templateEnv = jinja2.Environment(loader=templateLoader)
 
-class Settings:
-    def __init__(self, comfy_api: ComfyApi):
-        self.comfy_api = comfy_api
-
-    def load_settings(self):
-        system_info = self.comfy_api.system_info()
-        models: List[str] = system_info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
-        for model in models:
-            if model.startswith('sd-1.5\\'):
-                sd_models.append(
-                    OptionChoice(
-                        model.replace('sd-1.5\\', '').replace('.safetensors', ''),
-                        model
-                    )
+def set_comfy_settings(system_info):
+    models: List[str] = system_info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
+    for model in models:
+        if model.startswith('sd-1.5\\'):
+            sd_models.append(
+                OptionChoice(
+                    model.replace('sd-1.5\\', '').replace('.safetensors', ''),
+                    model
                 )
-                sd_select_models.append(
-                    SelectOption(
-                        label=model.replace('sd-1.5\\', '').replace('.safetensors', ''),
-                        value=model
-                    )
+            )
+            sd_select_models.append(
+                SelectOption(
+                    label=model.replace('sd-1.5\\', '').replace('.safetensors', ''),
+                    value=model
                 )
-            elif model.startswith('sdxl-1.0\\'):
-                sdxl_models.append(
-                    OptionChoice(model.replace('sdxl-1.0\\', '').replace('.safetensors', ''), model)
+            )
+        elif model.startswith('sdxl-1.0\\'):
+            sdxl_models.append(
+                OptionChoice(model.replace('sdxl-1.0\\', '').replace('.safetensors', ''), model)
+            )
+            sdxl_select_models.append(
+                SelectOption(
+                    label=model.replace('sdxl-1.0\\', '').replace('.safetensors', ''),
+                    value=model
                 )
-                sdxl_select_models.append(
-                    SelectOption(
-                        label=model.replace('sdxl-1.0\\', '').replace('.safetensors', ''),
-                        value=model
-                    )
-                )
-            else:
-                print(f"Unknown model type for {model}")
-        
+            )
+        else:
+            print(f"Unknown model type for {model}")
