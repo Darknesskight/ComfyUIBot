@@ -30,6 +30,9 @@ default_cfg = 8
 templateLoader = jinja2.FileSystemLoader(searchpath="./templates")
 templateEnv = jinja2.Environment(loader=templateLoader)
 
+sd_template = "sd-1.5.j2"
+sdxl_template = "sdxl-1.0.j2"
+
 def set_comfy_settings(system_info):
     models: List[str] = system_info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
     for model in models:
