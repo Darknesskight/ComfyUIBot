@@ -17,6 +17,12 @@ sdxl_models: List[OptionChoice] = []
 sd_select_models: List[SelectOption] = []
 sdxl_select_models: List[SelectOption] = []
 
+sd_loras: List[OptionChoice] = []
+sdxl_loras: List[OptionChoice] = []
+
+sd_select_loras: List[SelectOption] = []
+sdxl_select_loras: List[SelectOption] = []
+
 size_range = range(192, 1088, 64)
 
 default_sd_negs = "nsfw, embedding:bad-artist-anime, embedding:bad-artist, watermark, text, error, blurry, jpeg artifacts, cropped, worst quality, low quality, normal quality, jpeg artifacts, (signature), watermark, username, artist name, (worst quality, low quality:1.4), bad anatomy"
@@ -61,3 +67,31 @@ def set_comfy_settings(system_info):
             )
         else:
             print(f"Unknown model type for {model}")
+
+    loras: List[str] = system_info["LoraLoader"]["input"]["required"]["lora_name"][0]
+    for lora in loras:
+        if lora.startswith('sd-1.5\\'):
+            sd_loras.append(
+                OptionChoice(
+                    lora.replace('sd-1.5\\', '').replace('.safetensors', ''),
+                    lora
+                )
+            )
+            sd_select_loras.append(
+                SelectOption(
+                    label=lora.replace('sd-1.5\\', '').replace('.safetensors', ''),
+                    value=lora
+                )
+            )
+        elif lora.startswith('sdxl-1.0\\'):
+            sdxl_loras.append(
+                OptionChoice(lora.replace('sdxl-1.0\\', '').replace('.safetensors', ''), lora)
+            )
+            sdxl_select_loras.append(
+                SelectOption(
+                    label=lora.replace('sdxl-1.0\\', '').replace('.safetensors', ''),
+                    value=lora
+                )
+            )
+        else:
+            print(f"Unknown lora type for {lora}")

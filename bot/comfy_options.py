@@ -1,8 +1,26 @@
 from discord import option
 import functools
 from settings import size_range, default_steps, default_cfg
+import discord
 
-def draw_options(default_negs, default_model, models, default_width, default_height):
+
+def default_filter(list):
+    async def searcher(ctx: discord.AutocompleteContext):
+        string_starts_with = []
+        anywhere_in_string = []
+        for item in list:
+            if item.name.lower().startswith(str(ctx.value or "").lower()):
+                string_starts_with.append(item)
+            elif str(ctx.value or "").lower() in item.name.lower():
+                anywhere_in_string.append(item)
+        final_list = string_starts_with + anywhere_in_string
+        if not final_list:
+            final_list.append("None")
+        return final_list
+    return searcher
+
+
+def draw_options(default_negs, default_model, models, default_width, default_height, loras):
     def inner(func):
         @option(
             'prompt',
@@ -66,6 +84,27 @@ def draw_options(default_negs, default_model, models, default_width, default_hei
             min_value=1,
             max_value=4294967294,
             required=False,
+        )
+        @discord.option(
+            'lora',
+            str,
+            description='LoRA to use',
+            required=False,
+            autocomplete=default_filter(loras)
+        )
+        @discord.option(
+            'lora_two',
+            str,
+            description='Second LoRA to use',
+            required=False,
+            autocomplete=default_filter(loras)
+        )
+        @discord.option(
+            'lora_three',
+            str,
+            description='Thrid LoRA to use',
+            required=False,
+            autocomplete=default_filter(loras)
         )
         @option(
             'glitch',

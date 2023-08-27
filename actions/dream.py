@@ -11,6 +11,7 @@ import asyncio
 import time
 from api.comfy_api import get_history, queue_prompt, get_image
 import math
+import re
 
 class Status(Enum):
     READY = 1
@@ -31,21 +32,28 @@ async def dream(
     steps,
     seed,
     cfg,
+    lora=None,
+    lora_two=None,
+    lora_three=None
 ):
     await ctx.response.defer(invisible=False)
     try:
+        loras, prompt_w_loras, clean_prompt = parse_loras(prompt, lora, lora_two, lora_three)
+
         options = {
             "template": template,
-            "prompt": prompt,
+            "prompt": clean_prompt,
             "negative_prompt": negative_prompt,
             "cfg": cfg,
             "steps": steps,
             "model": model,
             "width": width,
             "height": height,
-            "seed": seed or random.randint(1, 4294967294),
+            "seed": seed or random.randint(1, 4294967294)
         }
-        rendered_template = templateEnv.get_template(template).render(**options)
+        rendered_template = templateEnv.get_template(template).render(**options, loras=loras)
+
+        options["prompt"] = prompt_w_loras
 
         model_display_name = options["model"].replace(".safetensors", "")
         job_id = add_job(options)
@@ -78,6 +86,43 @@ async def dream(
         await ctx.followup.send(
             "Unable to create image. Please see log for details"
         )
+
+
+def parse_loras(prompt, lora_one, lora_two, lora_three):
+    clean_prompt = prompt
+    lora_regex="(lora:\S+:\d+\.?\d*)"
+    matches = re.findall(lora_regex, prompt)
+
+    loras = []
+    for lora in matches:
+        clean_prompt = clean_prompt.replace(lora, "")
+        lora_segs = lora.split(":")
+        loras.append({
+            "name": lora_segs[1],
+            "strength": lora_segs[2]
+        })
+
+    if lora_one and lora_one != "None":
+        loras.append({
+            "name": lora_one,
+            "strength": 0.85
+        })
+    if lora_two and lora_two != "None":
+        loras.append({
+            "name": lora_two,
+            "strength": 0.85
+        })
+    if lora_three and lora_three != "None":
+        loras.append({
+            "name": lora_three,
+            "strength": 0.85
+        })
+
+    clean_prompt = clean_prompt.strip()
+    string_loras = " ".join(f'lora:{lora["name"]}:{lora["strength"]}' for lora in loras)
+    prompt_w_loras = f"{clean_prompt} {string_loras}".strip()
+
+    return loras, prompt_w_loras, clean_prompt
 
 class DrawJob():
     prompt_id = -1

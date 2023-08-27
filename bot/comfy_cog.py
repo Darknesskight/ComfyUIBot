@@ -3,6 +3,8 @@ import discord
 from settings import (
     sd_models,
     sdxl_models,
+    sd_loras,
+    sdxl_loras,
     default_sd_model,
     default_sdxl_model,
     default_sd_negs,
@@ -20,7 +22,7 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
     draw = discord.SlashCommandGroup(name="draw", description="Create an image")
 
     @draw.command(name="sd", description="Create an image using Stable Diffusion 1.5")
-    @draw_options(default_sd_negs, default_sd_model, sd_models, 512, 512)
+    @draw_options(default_sd_negs, default_sd_model, sd_models, 512, 512, sd_loras)
     async def dream_sd(
         self,
         ctx: discord.ApplicationContext,
@@ -32,6 +34,9 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         steps,
         seed,
         cfg,
+        lora,
+        lora_two,
+        lora_three,
         glitch,
     ):
         await dream(
@@ -46,12 +51,15 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
             steps,
             seed,
             cfg,
+            lora,
+            lora_two,
+            lora_three,
         )
 
     @draw.command(
         name="sdxl", description="Create an image using Stable Diffusion XL 1.0"
     )
-    @draw_options(default_sdxl_negs, default_sdxl_model, sdxl_models, 1024, 1024)
+    @draw_options(default_sdxl_negs, default_sdxl_model, sdxl_models, 1024, 1024, sdxl_loras)
     async def dream_sdxl(
         self,
         ctx: discord.ApplicationContext,
@@ -63,6 +71,9 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         steps,
         seed,
         cfg,
+        lora,
+        lora_two,
+        lora_three,
         glitch: Optional[bool] = None,
     ):
         await dream(
@@ -77,4 +88,7 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
             steps,
             seed,
             cfg,
+            lora,
+            lora_two,
+            lora_three,
         )

@@ -1,4 +1,28 @@
 {
+  "100": {
+    "inputs": {
+      "ckpt_name": {{model | tojson}}
+    },
+    "class_type": "CheckpointLoaderSimple"
+  },
+  {% for lora in loras %}
+  "{{loop.index + 100}}": {
+    "inputs": {
+      "lora_name": {{lora.name | tojson}},
+      "strength_model": {{lora.strength}},
+      "strength_clip": {{lora.strength}},
+      "model": [
+        "{{loop.index + 99}}",
+        0
+      ],
+      "clip": [
+        "{{loop.index + 99}}",
+        1
+      ]
+    },
+    "class_type": "LoraLoader"
+  },
+  {% endfor %}
   "3": {
     "inputs": {
       "seed": {{ seed }},
@@ -25,12 +49,6 @@
       ]
     },
     "class_type": "KSampler"
-  },
-  "4": {
-    "inputs": {
-      "ckpt_name": {{model | tojson}}
-    },
-    "class_type": "CheckpointLoaderSimple"
   },
   "5": {
     "inputs": {
@@ -70,7 +88,7 @@
     "inputs": {
       "stop_at_clip_layer": -2,
       "clip": [
-        "4",
+        "{{loras | length + 100}}",
         1
       ]
     },
@@ -93,7 +111,7 @@
     "inputs": {
       "ratio": 0.3,
       "model": [
-        "4",
+        "{{loras | length + 100}}",
         0
       ]
     },

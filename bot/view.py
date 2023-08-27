@@ -1,6 +1,6 @@
 import discord
 from api.job_db import get_job
-from settings import sdxl_select_models, sd_select_models
+from settings import sdxl_select_models, sd_select_models, sd_select_loras
 from actions.dream import dream
 import re
 
