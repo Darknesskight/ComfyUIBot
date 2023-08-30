@@ -15,6 +15,7 @@ class ComfySDView(discord.ui.View):
         self.add_item(RedrawButton(self, "sd_button_redraw"))
         self.add_item(EditButton(self, "sd_button_edit"))
         self.add_item(SpoilorButton(self, "sd_button_spoiler"))
+        self.add_item(DeleteButton(self, "sd_button_delete"))
         self.add_item(ModelSelect(sd_select_models, self, "sd_model_select"))
 
 
@@ -25,6 +26,7 @@ class ComfySDXLView(discord.ui.View):
         self.add_item(RedrawButton(self, "sdxl_button_redraw"))
         self.add_item(EditButton(self, "sdxl_button_edit"))
         self.add_item(SpoilorButton(self, "sdxl_button_spoiler"))
+        self.add_item(DeleteButton(self, "sdxl_button_delete"))
         self.add_item(ModelSelect(sdxl_select_models, self, "sdxl_model_select"))
 
 
@@ -123,6 +125,8 @@ class SpoilorButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        print(interaction.message.mentions[0])
+        print(interaction.message.mentions[0] == interaction.user)
         message = interaction.message.content
         await interaction.message.edit(
             message + "\n# Converting message to spoiler", attachments=[]
@@ -142,3 +146,28 @@ class SpoilorButton(discord.ui.Button):
         await interaction.followup.send(
             "Image changed to spoiler", ephemeral=True, delete_after=3
         )
+
+
+class DeleteButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="❌")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        has_manage_permission = interaction.channel.permissions_for(
+            interaction.user
+        ).manage_messages
+        same_user = interaction.message.mentions[0] == interaction.user
+        if has_manage_permission or same_user:
+            await interaction.message.delete()
+            await interaction.followup.send(
+                "Image deleted", ephemeral=True, delete_after=3
+            )
+        else:
+            await interaction.followup.send(
+                "You do not have permission to remove this image",
+                ephemeral=True,
+                delete_after=3,
+            )
