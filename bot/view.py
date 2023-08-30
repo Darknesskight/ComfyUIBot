@@ -3,6 +3,8 @@ from api.job_db import get_job
 from settings import sdxl_select_models, sd_select_models, sd_select_loras
 from actions.dream import dream
 import re
+import urllib
+import io
 
 # View used for SD drawing
 class ComfySDView(discord.ui.View):
@@ -11,6 +13,7 @@ class ComfySDView(discord.ui.View):
 
         self.add_item(RedrawButton(self, "sd_button_redraw"))
         self.add_item(EditButton(self, "sd_button_edit"))
+        self.add_item(SpoilorButton(self, "sd_button_spoiler"))
         self.add_item(
             ModelSelect(sd_select_models, self, "sd_model_select")
         )
@@ -22,6 +25,7 @@ class ComfySDXLView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(RedrawButton(self, "sdxl_button_redraw"))
         self.add_item(EditButton(self, "sdxl_button_edit"))
+        self.add_item(SpoilorButton(self, "sdxl_button_spoiler"))
         self.add_item(
             ModelSelect(sdxl_select_models, self, "sdxl_model_select")
         )
@@ -107,4 +111,37 @@ class RedrawButton(discord.ui.Button):
             **job_data,
             view=self.parent_view,
             ctx=interaction
+        )
+
+class SpoilorButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="🕵️")
+        self.parent_view = parent_view
+    
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        message = interaction.message.content
+        await interaction.message.edit(
+            message + "\n# Converting message to spoiler",
+            attachments=[]
+        )
+        
+        files = []
+        for attachment in interaction.message.attachments:
+            file = await attachment.read()
+            files.append(
+                discord.File(fp=io.BytesIO(file), filename="output.png", spoiler=True)
+            )
+                
+        await interaction.message.edit(
+            message,
+            files=files,
+            view=self.parent_view,
+            attachments=[]
+        )
+
+        await interaction.followup.send(
+            "Image changed to spoiler",
+            ephemeral=True,
+            delete_after=3
         )

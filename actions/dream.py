@@ -1,4 +1,4 @@
-from settings import templateEnv
+from settings import templateEnv, sd_loras, sdxl_loras
 from api.job_db import add_job
 import random
 import discord
@@ -34,26 +34,31 @@ async def dream(
     cfg,
     lora=None,
     lora_two=None,
-    lora_three=None
+    lora_three=None,
+    hires=None,
+    hires_strength=0.6
 ):
     await ctx.response.defer(invisible=False)
     try:
-        loras, prompt_w_loras, clean_prompt = parse_loras(prompt, lora, lora_two, lora_three)
+        if hires == "None":
+            hires = None
 
         options = {
             "template": template,
-            "prompt": clean_prompt,
+            "prompt": prompt,
             "negative_prompt": negative_prompt,
             "cfg": cfg,
             "steps": steps,
             "model": model,
             "width": width,
             "height": height,
+            "hires": hires,
+            "hires_strength": hires_strength,
             "seed": seed or random.randint(1, 4294967294)
         }
-        rendered_template = templateEnv.get_template(template).render(**options, loras=loras)
 
-        options["prompt"] = prompt_w_loras
+        rendered_template = process_template(template, options, lora, lora_two, lora_three)
+        print(rendered_template)
 
         model_display_name = options["model"].replace(".safetensors", "")
         job_id = add_job(options)
@@ -87,6 +92,26 @@ async def dream(
             "Unable to create image. Please see log for details"
         )
 
+def process_template(template, options, lora, lora_two, lora_three):
+    template_options = {}
+    template_options.update(options)
+
+    loras, prompt_w_loras, clean_prompt = parse_loras(options["prompt"], lora, lora_two, lora_three)
+    template_options["prompt"] = clean_prompt
+    options["prompt"] = prompt_w_loras
+    template_options["loras"] = loras
+
+    if options["hires"]:
+        template_options["width"] = round_to_multiple(options["width"]/2, 4)
+        template_options["height"] = round_to_multiple(options["height"]/2, 4)
+        template_options["hires_width"] = options["width"]
+        template_options["hires_height"] = options["height"]
+
+    print(template_options)
+    return templateEnv.get_template(template).render(**template_options)
+
+def round_to_multiple(number, multiple):
+    return multiple * round(number / multiple)
 
 def parse_loras(prompt, lora_one, lora_two, lora_three):
     clean_prompt = prompt
@@ -118,8 +143,18 @@ def parse_loras(prompt, lora_one, lora_two, lora_three):
             "strength": 0.85
         })
 
+    # clean up lora list.
+    for lora in loras:
+        for lora_item in [*sd_loras, *sdxl_loras]:
+            if lora["name"] == lora_item.name or lora["name"] == lora_item.value:
+                lora["name"] = lora_item.value
+                lora["clean_name"] = lora_item.name
+                break
+        if not lora.get("clean_name"):
+            loras.remove(lora)
+
     clean_prompt = clean_prompt.strip()
-    string_loras = " ".join(f'lora:{lora["name"]}:{lora["strength"]}' for lora in loras)
+    string_loras = " ".join(f'lora:{lora["clean_name"]}:{lora["strength"]}' for lora in loras)
     prompt_w_loras = f"{clean_prompt} {string_loras}".strip()
 
     return loras, prompt_w_loras, clean_prompt

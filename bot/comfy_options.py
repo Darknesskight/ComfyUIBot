@@ -1,6 +1,6 @@
 from discord import option
 import functools
-from settings import size_range, default_steps, default_cfg
+from settings import size_range, default_steps, default_cfg, upscale_latent
 import discord
 
 
@@ -20,7 +20,7 @@ def default_filter(list):
     return searcher
 
 
-def draw_options(default_negs, default_model, models, default_width, default_height, loras):
+def draw_options(default_negs, default_model, models, default_width, default_height, loras, default_hires):
     def inner(func):
         @option(
             'prompt',
@@ -105,6 +105,23 @@ def draw_options(default_negs, default_model, models, default_width, default_hei
             description='Thrid LoRA to use',
             required=False,
             autocomplete=default_filter(loras)
+        )
+        @option(
+            'hires',
+            str,
+            description='Enable hires fix. Width and Height will be the final resolution',
+            required=False,
+            choices=upscale_latent,
+            default=default_hires
+        )
+        @option(
+            'hires_strength',
+            float,
+            description='How strong the denoise is when doing hires fix',
+            required=False,
+            min_value=0,
+            max_value=1,
+            default=0.65
         )
         @option(
             'glitch',

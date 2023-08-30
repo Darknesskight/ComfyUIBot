@@ -94,19 +94,6 @@
     },
     "class_type": "CLIPSetLastLayer"
   },
-  "10": {
-    "inputs": {
-      "samples": [
-        "3",
-        0
-      ],
-      "vae": [
-        "8",
-        0
-      ]
-    },
-    "class_type": "VAEDecode"
-  },
   "11": {
     "inputs": {
       "ratio": 0.3,
@@ -116,6 +103,68 @@
       ]
     },
     "class_type": "TomePatchModel"
+  },
+  {% if hires is not none %}
+  "13": {
+    "inputs": {
+      "upscale_method": {{hires | tojson }},
+      "width": {{hires_width}},
+      "height": {{hires_height}},
+      "crop": "disabled",
+      "samples": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "LatentUpscale"
+  },
+  "14": {
+    "inputs": {
+      "seed": {{ seed }},
+      "steps": 15,
+      "cfg": {{ cfg }},
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": {{ hires_strength }},
+      "model": [
+        "11",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "KSampler"
+  },
+  {% endif %}
+  "10": {
+    "inputs": {
+      {% if hires is not none %}
+      "samples": [
+        "14",
+        0
+      ],
+      {% else %}
+      "samples": [
+        "3",
+        0
+      ],
+      {% endif %}
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode"
   },
   "12": {
     "inputs": {

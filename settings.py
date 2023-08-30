@@ -23,6 +23,8 @@ sdxl_loras: List[OptionChoice] = []
 sd_select_loras: List[SelectOption] = []
 sdxl_select_loras: List[SelectOption] = []
 
+upscale_latent: List[str] = ["None"]
+
 size_range = range(192, 1088, 64)
 
 default_sd_negs = "nsfw, embedding:bad-artist-anime, embedding:bad-artist, watermark, text, error, blurry, jpeg artifacts, cropped, worst quality, low quality, normal quality, jpeg artifacts, (signature), watermark, username, artist name, (worst quality, low quality:1.4), bad anatomy"
@@ -95,3 +97,5 @@ def set_comfy_settings(system_info):
             )
         else:
             print(f"Unknown lora type for {lora}")
+
+    upscale_latent.extend(system_info["LatentUpscale"]["input"]["required"]["upscale_method"][0])
