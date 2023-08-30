@@ -17,121 +17,132 @@ def default_filter(list):
         if not final_list:
             final_list.append("None")
         return final_list
+
     return searcher
 
 
-def draw_options(default_negs, default_model, models, default_width, default_height, loras, default_hires):
+def draw_options(
+    default_negs,
+    default_model,
+    models,
+    default_width,
+    default_height,
+    loras,
+    default_hires,
+):
     def inner(func):
         @option(
-            'prompt',
+            "prompt",
             str,
-            description='Prompt to draw with',
+            description="Prompt to draw with",
             required=True,
-            )
-        @option(
-            'negative_prompt',
-            str,
-            description='Negative prompts to draw with',
-            required=False,
-            default=default_negs
         )
         @option(
-            'model',
+            "negative_prompt",
             str,
-            description='Model to use for drawing',
+            description="Negative prompts to draw with",
+            required=False,
+            default=default_negs,
+        )
+        @option(
+            "model",
+            str,
+            description="Model to use for drawing",
             required=False,
             choices=models,
-            default=default_model
+            default=default_model,
         )
         @option(
-            'width',
+            "width",
             int,
-            description='Width of the image',
+            description="Width of the image",
             required=False,
             choices=size_range,
-            default=default_width
+            default=default_width,
         )
         @option(
-            'height',
+            "height",
             int,
-            description='Height of the image',
+            description="Height of the image",
             required=False,
             choices=size_range,
-            default=default_height
+            default=default_height,
         )
         @option(
-            'steps',
+            "steps",
             int,
-            description='Steps to take to generate the image',
+            description="Steps to take to generate the image",
             min_value=1,
             max_value=100,
             required=False,
-            default=default_steps
+            default=default_steps,
         )
         @option(
-            'cfg',
+            "cfg",
             int,
-            description='Classifier Free Guidance scale',
+            description="Classifier Free Guidance scale",
             min_value=1,
             max_value=13,
             required=False,
-            default=default_cfg
+            default=default_cfg,
         )
         @option(
-            'seed',
+            "seed",
             int,
-            description='Seed to use. If not set a random one will be used.',
+            description="Seed to use. If not set a random one will be used.",
             min_value=1,
             max_value=4294967294,
             required=False,
         )
         @discord.option(
-            'lora',
+            "lora",
             str,
-            description='LoRA to use',
+            description="LoRA to use",
             required=False,
-            autocomplete=default_filter(loras)
+            autocomplete=default_filter(loras),
         )
         @discord.option(
-            'lora_two',
+            "lora_two",
             str,
-            description='Second LoRA to use',
+            description="Second LoRA to use",
             required=False,
-            autocomplete=default_filter(loras)
+            autocomplete=default_filter(loras),
         )
         @discord.option(
-            'lora_three',
+            "lora_three",
             str,
-            description='Thrid LoRA to use',
+            description="Thrid LoRA to use",
             required=False,
-            autocomplete=default_filter(loras)
+            autocomplete=default_filter(loras),
         )
         @option(
-            'hires',
+            "hires",
             str,
-            description='Enable hires fix. Width and Height will be the final resolution',
+            description="Enable hires fix. Width and Height will be the final resolution",
             required=False,
             choices=upscale_latent,
-            default=default_hires
+            default=default_hires,
         )
         @option(
-            'hires_strength',
+            "hires_strength",
             float,
-            description='How strong the denoise is when doing hires fix',
+            description="How strong the denoise is when doing hires fix",
             required=False,
             min_value=0,
             max_value=1,
-            default=0.65
+            default=0.65,
         )
         @option(
-            'glitch',
+            "glitch",
             bool,
-            description='Use the wrong VAE on purpose to create a glitchy mess',
+            description="Use the wrong VAE on purpose to create a glitchy mess",
             required=False,
-            default=False
+            default=False,
         )
         @functools.wraps(func)  # Not required, but generally considered good practice
         async def newfunc(*args, **kwargs):
             return await func(*args, **kwargs)
+
         return newfunc
+
     return inner

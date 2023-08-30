@@ -1,10 +1,14 @@
 import sqlite3
 import json
 
-_conn = sqlite3.connect('job.db')
+_conn = sqlite3.connect("job.db")
+
 
 def init_db():
-    _conn.cursor().execute("CREATE TABLE IF NOT EXISTS job (id INTEGER PRIMARY KEY AUTOINCREMENT, data json);")
+    _conn.cursor().execute(
+        "CREATE TABLE IF NOT EXISTS job (id INTEGER PRIMARY KEY AUTOINCREMENT, data json);"
+    )
+
 
 def add_job(data):
     c = _conn.cursor()
@@ -12,6 +16,7 @@ def add_job(data):
     _conn.commit()
 
     return c.lastrowid
+
 
 def get_job(id):
     c = _conn.cursor()

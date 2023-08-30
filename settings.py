@@ -41,30 +41,34 @@ templateEnv = jinja2.Environment(loader=templateLoader)
 sd_template = "sd-1.5.j2"
 sdxl_template = "sdxl-1.0.j2"
 
+
 def set_comfy_settings(system_info):
-    models: List[str] = system_info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
+    models: List[str] = system_info["CheckpointLoaderSimple"]["input"]["required"][
+        "ckpt_name"
+    ][0]
     for model in models:
-        if model.startswith('sd-1.5\\'):
+        if model.startswith("sd-1.5\\"):
             sd_models.append(
                 OptionChoice(
-                    model.replace('sd-1.5\\', '').replace('.safetensors', ''),
-                    model
+                    model.replace("sd-1.5\\", "").replace(".safetensors", ""), model
                 )
             )
             sd_select_models.append(
                 SelectOption(
-                    label=model.replace('sd-1.5\\', '').replace('.safetensors', ''),
-                    value=model
+                    label=model.replace("sd-1.5\\", "").replace(".safetensors", ""),
+                    value=model,
                 )
             )
-        elif model.startswith('sdxl-1.0\\'):
+        elif model.startswith("sdxl-1.0\\"):
             sdxl_models.append(
-                OptionChoice(model.replace('sdxl-1.0\\', '').replace('.safetensors', ''), model)
+                OptionChoice(
+                    model.replace("sdxl-1.0\\", "").replace(".safetensors", ""), model
+                )
             )
             sdxl_select_models.append(
                 SelectOption(
-                    label=model.replace('sdxl-1.0\\', '').replace('.safetensors', ''),
-                    value=model
+                    label=model.replace("sdxl-1.0\\", "").replace(".safetensors", ""),
+                    value=model,
                 )
             )
         else:
@@ -72,30 +76,33 @@ def set_comfy_settings(system_info):
 
     loras: List[str] = system_info["LoraLoader"]["input"]["required"]["lora_name"][0]
     for lora in loras:
-        if lora.startswith('sd-1.5\\'):
+        if lora.startswith("sd-1.5\\"):
             sd_loras.append(
                 OptionChoice(
-                    lora.replace('sd-1.5\\', '').replace('.safetensors', ''),
-                    lora
+                    lora.replace("sd-1.5\\", "").replace(".safetensors", ""), lora
                 )
             )
             sd_select_loras.append(
                 SelectOption(
-                    label=lora.replace('sd-1.5\\', '').replace('.safetensors', ''),
-                    value=lora
+                    label=lora.replace("sd-1.5\\", "").replace(".safetensors", ""),
+                    value=lora,
                 )
             )
-        elif lora.startswith('sdxl-1.0\\'):
+        elif lora.startswith("sdxl-1.0\\"):
             sdxl_loras.append(
-                OptionChoice(lora.replace('sdxl-1.0\\', '').replace('.safetensors', ''), lora)
+                OptionChoice(
+                    lora.replace("sdxl-1.0\\", "").replace(".safetensors", ""), lora
+                )
             )
             sdxl_select_loras.append(
                 SelectOption(
-                    label=lora.replace('sdxl-1.0\\', '').replace('.safetensors', ''),
-                    value=lora
+                    label=lora.replace("sdxl-1.0\\", "").replace(".safetensors", ""),
+                    value=lora,
                 )
             )
         else:
             print(f"Unknown lora type for {lora}")
 
-    upscale_latent.extend(system_info["LatentUpscale"]["input"]["required"]["upscale_method"][0])
+    upscale_latent.extend(
+        system_info["LatentUpscale"]["input"]["required"]["upscale_method"][0]
+    )

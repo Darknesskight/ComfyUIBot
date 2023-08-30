@@ -22,4 +22,6 @@ if __name__ == "__main__":
         bot.add_view(ComfySDXLView())
 
     bot.add_cog(ComfyCog())
-    bot.run(bot_token, )
+    bot.run(
+        bot_token,
+    )
