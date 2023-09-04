@@ -191,21 +191,24 @@ class DrawJob:
         if self.state != Status.QUEUED and self.state != Status.RUNNING:
             return
 
-        # Ignore preview image message.
-        if not isinstance(ws_message, str):
-            return
+        # Handle preview image.
+        if isinstance(ws_message, bytes) and self.state == Status.RUNNING:
+            image_buffer = ws_message[8:]
+            self.progress_msg.image=io.BytesIO(image_buffer)
 
-        message = json.loads(ws_message)
-        data = message["data"]
+        # Handle normal messages
+        if isinstance(ws_message, str):
+            message = json.loads(ws_message)
+            data = message["data"]
 
-        if message["type"] == "execution_start":
-            await self.on_execution_start(data)
+            if message["type"] == "execution_start":
+                await self.on_execution_start(data)
 
-        if message["type"] == "executing":
-            await self.on_executing(data)
+            if message["type"] == "executing":
+                await self.on_executing(data)
 
-        if message["type"] == "progress":
-            await self.on_progress(data)
+            if message["type"] == "progress":
+                await self.on_progress(data)
 
     async def on_execution_start(self, data):
         if data["prompt_id"] != self.prompt_id:
@@ -243,6 +246,8 @@ class DrawJob:
 class ProgressMessage:
     last_update = time.time()
     msg = None
+    image = None
+    last_sent_image = None
 
     def __init__(self, followup):
         super().__init__()
@@ -257,10 +262,16 @@ class ProgressMessage:
             self.last_update = time.time()
 
     async def send_message(self, message):
+        files = []
+        if self.image and self.image != self.last_sent_image:
+            files.append(discord.File(self.image, filename="progress.jpg"))
         if not self.msg:
-            self.msg = await self.followup.send(message, wait=True)
+            self.msg = await self.followup.send(message, files=files, wait=True)
         else:
-            await self.msg.edit(message)
+            await self.msg.edit(message, files=files)
+        
+        # Cache what we sent last so we don't resend the same image.
+        self.last_sent_image = self.image
 
     async def delete_message(self):
         if self.msg:
