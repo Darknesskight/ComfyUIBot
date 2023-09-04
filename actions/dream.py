@@ -194,7 +194,7 @@ class DrawJob:
         # Handle preview image.
         if isinstance(ws_message, bytes) and self.state == Status.RUNNING:
             image_buffer = ws_message[8:]
-            self.progress_msg.image=io.BytesIO(image_buffer)
+            self.progress_msg.image = io.BytesIO(image_buffer)
 
         # Handle normal messages
         if isinstance(ws_message, str):
@@ -269,7 +269,7 @@ class ProgressMessage:
             self.msg = await self.followup.send(message, files=files, wait=True)
         else:
             await self.msg.edit(message, files=files)
-        
+
         # Cache what we sent last so we don't resend the same image.
         self.last_sent_image = self.image
 

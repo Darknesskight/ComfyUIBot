@@ -11,6 +11,7 @@ if __name__ == "__main__":
     set_comfy_settings(get_system_info())
 
     from bot.comfy_cog import ComfyCog, ComfySDView, ComfySDXLView
+    from bot.civitai_cog import CivitaiCog
 
     bot = discord.Bot()
 
@@ -22,6 +23,7 @@ if __name__ == "__main__":
         bot.add_view(ComfySDXLView())
 
     bot.add_cog(ComfyCog())
+    bot.add_cog(CivitaiCog())
     bot.run(
         bot_token,
     )
