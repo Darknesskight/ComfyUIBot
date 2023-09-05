@@ -1,5 +1,4 @@
 from discord.ext import commands
-from discord import option
 import discord
 from actions.search import search
 from bot.civitai_options import civitai_options
