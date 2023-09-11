@@ -5,6 +5,7 @@ from actions.dream import dream
 import re
 import urllib
 import io
+import asyncio
 
 
 # View used for SD drawing
@@ -71,10 +72,10 @@ class ModelSelect(discord.ui.Select):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
-        job_id_search = re.search(
-            "Job ID ``(\d+)``$", interaction.message.content, re.IGNORECASE
+        job_id_search = re.findall(
+            "Job ID ``(\d+)``", interaction.message.content, re.IGNORECASE
         )
-        job_id = job_id_search.group(1)
+        job_id = job_id_search[-1]
 
         job_data = get_job(job_id)
         job_data["model"] = self.values[0]
@@ -92,10 +93,10 @@ class EditButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
-        job_id_search = re.search(
-            "Job ID ``(\d+)``$", interaction.message.content, re.IGNORECASE
+        job_id_search = re.findall(
+            "Job ID ``(\d+)``", interaction.message.content, re.IGNORECASE
         )
-        job_id = job_id_search.group(1)
+        job_id = job_id_search[-1]
 
         job_data = get_job(job_id)
         await interaction.response.send_modal(EditModal(job_data, self.parent_view))
@@ -107,10 +108,10 @@ class RedrawButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
-        job_id_search = re.search(
-            "Job ID ``(\d+)``$", interaction.message.content, re.IGNORECASE
+        job_id_search = re.findall(
+            "Job ID ``(\d+)``", interaction.message.content, re.IGNORECASE
         )
-        job_id = job_id_search.group(1)
+        job_id = job_id_search[-1]
 
         job_data = get_job(job_id)
         job_data["seed"] = None
@@ -139,9 +140,7 @@ class SpoilorButton(discord.ui.Button):
                 discord.File(fp=io.BytesIO(file), filename="output.png", spoiler=True)
             )
 
-        await interaction.message.edit(
-            message, files=files, view=self.parent_view, attachments=[]
-        )
+        await interaction.message.edit(message, files=files, view=self.parent_view, attachments=[])
 
         await interaction.followup.send(
             "Image changed to spoiler", ephemeral=True, delete_after=3

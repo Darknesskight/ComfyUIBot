@@ -13,7 +13,6 @@ async def search_models(type, query, base_model, sort, period):
         "query": query,
         "baseModels": base_model,
         "limit": 10,
-        "nsfw": "false",
         "sort": sort,
         "period": period,
     }

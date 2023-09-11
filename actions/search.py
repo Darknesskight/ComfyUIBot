@@ -121,7 +121,7 @@ def filter_images(images):
 
     filtered_images = []
     for image in images:
-        if image["type"] == "image":
+        if image["type"] == "image" and image["nsfw"] in ["None", "Soft"]:
             filtered_images.append(image)
 
     return filtered_images
