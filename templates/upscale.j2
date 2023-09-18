@@ -1,0 +1,36 @@
+{
+  "1": {
+    "inputs": {
+      "image": {{image | tojson}}
+    },
+    "class_type": "ETN_LoadImageBase64"
+  },
+  "2": {
+    "inputs": {
+      "model_name": "SwinIR_4x.pth"
+    },
+    "class_type": "UpscaleModelLoader"
+  },
+  "3": {
+    "inputs": {
+      "upscale_model": [
+        "2",
+        0
+      ],
+      "image": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "ImageUpscaleWithModel"
+  },
+  "4": {
+    "inputs": {
+      "images": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "PreviewImage"
+  }
+}

@@ -139,22 +139,23 @@ def parse_loras(prompt, lora_one, lora_two, lora_three):
         loras.append({"name": lora_three, "strength": 0.85})
 
     # clean up lora list.
+    clean_loras = []
     for lora in loras:
         for lora_item in [*sd_loras, *sdxl_loras]:
             if lora["name"] == lora_item.name or lora["name"] == lora_item.value:
                 lora["name"] = lora_item.value
                 lora["clean_name"] = lora_item.name
                 break
-        if not lora.get("clean_name"):
-            loras.remove(lora)
+        if lora.get("clean_name"):
+            clean_loras.append(lora)
 
     clean_prompt = clean_prompt.strip()
     string_loras = " ".join(
-        f'lora:{lora["clean_name"]}:{lora["strength"]}' for lora in loras
+        f'lora:{lora["clean_name"]}:{lora["strength"]}' for lora in clean_loras
     )
     prompt_w_loras = f"{clean_prompt} {string_loras}".strip()
 
-    return loras, prompt_w_loras, clean_prompt
+    return clean_loras, prompt_w_loras, clean_prompt
 
 
 class DrawJob:

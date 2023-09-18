@@ -1,11 +1,11 @@
 import discord
 from api.job_db import get_job
-from settings import sdxl_select_models, sd_select_models, sd_select_loras
+from settings import sdxl_select_models, sd_select_models
 from actions.dream import dream
+from actions.upscale import upscale
+from actions.glitch import glitch
 import re
-import urllib
 import io
-import asyncio
 
 
 # View used for SD drawing
@@ -16,7 +16,9 @@ class ComfySDView(discord.ui.View):
         self.add_item(RedrawButton(self, "sd_button_redraw"))
         self.add_item(EditButton(self, "sd_button_edit"))
         self.add_item(SpoilorButton(self, "sd_button_spoiler"))
+        self.add_item(UpscaleButton(self, "sd_button_upscale"))
         self.add_item(DeleteButton(self, "sd_button_delete"))
+        self.add_item(GlitchButton(self, "sd_button_glitch"))
         self.add_item(ModelSelect(sd_select_models, self, "sd_model_select"))
 
 
@@ -27,8 +29,17 @@ class ComfySDXLView(discord.ui.View):
         self.add_item(RedrawButton(self, "sdxl_button_redraw"))
         self.add_item(EditButton(self, "sdxl_button_edit"))
         self.add_item(SpoilorButton(self, "sdxl_button_spoiler"))
+        self.add_item(UpscaleButton(self, "sdxl_button_upscale"))
         self.add_item(DeleteButton(self, "sdxl_button_delete"))
+        self.add_item(GlitchButton(self, "sdxl_button_glitch"))
         self.add_item(ModelSelect(sdxl_select_models, self, "sdxl_model_select"))
+
+# View used for upscale
+class UpscaleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(SpoilorButton(self, "upscale_button_spoiler"))
+        self.add_item(DeleteButton(self, "upscale_button_delete"))
 
 
 # Edit modal used when clicking one of the pen buttons.
@@ -170,3 +181,29 @@ class DeleteButton(discord.ui.Button):
                 ephemeral=True,
                 delete_after=3,
             )
+
+class UpscaleButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="⬆️")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        attachments = interaction.message.attachments
+        if(len(attachments) != 1):
+            await interaction.followup.send("Unable to upscale image.")
+            return
+
+        await upscale(interaction, attachments[0], UpscaleView())
+
+class GlitchButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="🦠")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        attachments = interaction.message.attachments
+        if(len(attachments) != 1):
+            await interaction.followup.send("Unable to gltich image.")
+            return
+
+        await glitch(interaction, attachments[0], UpscaleView())

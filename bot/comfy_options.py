@@ -94,21 +94,21 @@ def draw_options(
             max_value=4294967294,
             required=False,
         )
-        @discord.option(
+        @option(
             "lora",
             str,
             description="LoRA to use",
             required=False,
             autocomplete=default_filter(loras),
         )
-        @discord.option(
+        @option(
             "lora_two",
             str,
             description="Second LoRA to use",
             required=False,
             autocomplete=default_filter(loras),
         )
-        @discord.option(
+        @option(
             "lora_three",
             str,
             description="Thrid LoRA to use",
@@ -131,13 +131,6 @@ def draw_options(
             min_value=0,
             max_value=1,
             default=0.65,
-        )
-        @option(
-            "glitch",
-            bool,
-            description="Use the wrong VAE on purpose to create a glitchy mess",
-            required=False,
-            default=False,
         )
         @functools.wraps(func)  # Not required, but generally considered good practice
         async def newfunc(*args, **kwargs):

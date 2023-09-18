@@ -47,11 +47,10 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         lora_three,
         hires,
         hires_strength,
-        glitch,
     ):
         await dream(
             ctx,
-            sd_template if not glitch else sdxl_template,
+            sd_template,
             ComfySDView(),
             prompt,
             negative_prompt,
@@ -90,11 +89,10 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         lora_three,
         hires,
         hires_strength,
-        glitch,
     ):
         await dream(
             ctx,
-            sdxl_template if not glitch else sd_template,
+            sdxl_template,
             ComfySDXLView(),
             prompt,
             negative_prompt,
