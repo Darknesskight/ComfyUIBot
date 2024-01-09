@@ -30,7 +30,7 @@ size_range = range(192, 1088, 64)
 default_sd_negs = "nsfw, embedding:bad-artist-anime, embedding:bad-artist, watermark, text, error, blurry, jpeg artifacts, cropped, worst quality, low quality, normal quality, jpeg artifacts, (signature), watermark, username, artist name, (worst quality, low quality:1.4), bad anatomy"
 default_sdxl_negs = "(worst quality,low quality:1.2),(bad anatomy),(3d:1.2),blurry, watermark, signature, ugly, poorly drawn, embedding:unaestheticXLv13"
 default_sd_model = "sd-1.5\\meinapastel_v6Pastel.safetensors"
-default_sdxl_model = "sdxl-1.0\\sdxlUnstableDiffusers_v5UnchainedSlayer.safetensors"
+default_sdxl_model = "sdxl-1.0\\kohakuXLBeta_beta5.safetensors"
 
 default_steps = 20
 default_cfg = 8
