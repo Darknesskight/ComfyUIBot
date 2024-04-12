@@ -25,7 +25,7 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
         name="autoreply",
         description="Enable Tea autoreply for this channel. Rerun in the same channel to disable",
     )
-    async def autoreply(self, ctx: commands.Context):
+    async def autoreply(self, ctx: ApplicationContext):
         await ctx.response.defer()
         guild_autoreplying = await toggle_guild_autoreply(ctx.guild.id, ctx.channel.id)
 
@@ -41,7 +41,7 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
     @slash_command(
         name="optout", description="Opt out of Tea processesing your messages."
     )
-    async def optout(self, ctx: commands.Context):
+    async def optout(self, ctx: ApplicationContext):
         await ctx.response.defer()
         user_opted_out = await toggle_user_optout(ctx.author.name)
 
