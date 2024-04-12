@@ -34,6 +34,7 @@ class ComfySDXLView(discord.ui.View):
         self.add_item(GlitchButton(self, "sdxl_button_glitch"))
         self.add_item(ModelSelect(sdxl_select_models, self, "sdxl_model_select"))
 
+
 # View used for upscale
 class UpscaleView(discord.ui.View):
     def __init__(self):
@@ -70,6 +71,47 @@ class EditModal(discord.ui.Modal):
         self.job_data["negative_prompt"] = self.children[1].value
 
         await dream(**self.job_data, view=self.parent_view, ctx=interaction)
+
+
+class ServerPromptModal(discord.ui.Modal):
+    def __init__(self, server_prompt, on_submit) -> None:
+        super().__init__(title="Server Prompt")
+        self.server_prompt = server_prompt
+        self.on_submit = on_submit
+
+        self.add_item(
+            discord.ui.InputText(
+                label="New prompt",
+                value=server_prompt or "",
+                required=False,
+                style=discord.InputTextStyle.long,
+            )
+        )
+
+    async def callback(self, interaction):
+        await self.on_submit(self.children[0].value)
+        await interaction.response.send_message("Server prompt updated.")
+
+
+class UserPromptModal(discord.ui.Modal):
+    def __init__(self, user_prompt, on_submit) -> None:
+        super().__init__(title="User Prompt")
+        self.user_prompt = user_prompt
+        self.on_submit = on_submit
+
+        self.add_item(
+            discord.ui.InputText(
+                label="New prompt",
+                value=user_prompt or "",
+                required=False,
+                max_length=1000,
+                style=discord.InputTextStyle.long,
+            )
+        )
+
+    async def callback(self, interaction):
+        await self.on_submit(self.children[0].value)
+        await interaction.response.send_message("User prompt updated.")
 
 
 # Select dropdown for models.
@@ -151,7 +193,9 @@ class SpoilorButton(discord.ui.Button):
                 discord.File(fp=io.BytesIO(file), filename="output.png", spoiler=True)
             )
 
-        await interaction.message.edit(message, files=files, view=self.parent_view, attachments=[])
+        await interaction.message.edit(
+            message, files=files, view=self.parent_view, attachments=[]
+        )
 
         await interaction.followup.send(
             "Image changed to spoiler", ephemeral=True, delete_after=3
@@ -182,6 +226,7 @@ class DeleteButton(discord.ui.Button):
                 delete_after=3,
             )
 
+
 class UpscaleButton(discord.ui.Button):
     def __init__(self, parent_view, custom_id):
         super().__init__(custom_id=custom_id, emoji="⬆️")
@@ -189,11 +234,12 @@ class UpscaleButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         attachments = interaction.message.attachments
-        if(len(attachments) != 1):
+        if len(attachments) != 1:
             await interaction.followup.send("Unable to upscale image.")
             return
 
         await upscale(interaction, attachments[0], UpscaleView())
+
 
 class GlitchButton(discord.ui.Button):
     def __init__(self, parent_view, custom_id):
@@ -202,7 +248,7 @@ class GlitchButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         attachments = interaction.message.attachments
-        if(len(attachments) != 1):
+        if len(attachments) != 1:
             await interaction.followup.send("Unable to gltich image.")
             return
 

@@ -95,6 +95,78 @@ async def dream(
         await ctx.followup.send("Unable to create image. Please see log for details")
 
 
+async def tea_dream(
+    message: discord.Message,
+    template,
+    view,
+    prompt,
+    negative_prompt,
+    model,
+    width,
+    height,
+    steps,
+    seed,
+    cfg,
+    lora=None,
+    lora_two=None,
+    lora_three=None,
+    hires=None,
+    hires_strength=0.6,
+):
+    try:
+        if hires == "None":
+            hires = None
+
+        options = {
+            "template": template,
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "cfg": cfg,
+            "steps": steps,
+            "model": model,
+            "width": width,
+            "height": height,
+            "hires": hires,
+            "hires_strength": hires_strength,
+            "seed": seed or random.randint(1, 4294967294),
+        }
+
+        rendered_template = process_template(
+            template, options, lora, lora_two, lora_three
+        )
+        print(rendered_template)
+
+        model_display_name = options["model"].replace(".safetensors", "")
+        job_id = add_job(options)
+        response_message = textwrap.dedent(
+            f"""\
+                {message.author.mention} here is your image!
+                Prompt: ``{options["prompt"]}``
+                Model ``{model_display_name}``
+                CFG ``{options["cfg"]}`` - Steps: ``{options["steps"]}`` - Seed ``{options["seed"]}``
+                Size ``{options["width"]}``x``{options["height"]}`` Job ID ``{job_id}``
+            """
+        )
+
+        promptJson = json.loads(rendered_template)
+        progress_msg = TeaProgressMessage(message.channel)
+        job = DrawJob(promptJson, progress_msg)
+
+        images = await job.run()
+
+        await progress_msg.send_message("Drawing complete. Uploading now.")
+
+        for node_id in images:
+            for image_data in images[node_id]:
+                file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
+                await message.channel.send(response_message, file=file, view=view)
+                await progress_msg.delete_message()
+
+    except Exception as e:
+        print(e)
+        await message.channel.send("Unable to create image. Please see log for details")
+
+
 def process_template(template, options, lora, lora_two, lora_three):
     template_options = {}
     template_options.update(options)
@@ -170,13 +242,13 @@ class DrawJob:
         self.progress_msg = progress_msg
 
     async def run(self):
-        add_client(self)
+        await add_client(self)
         try:
             self.send_prompt()
             await self.wait_for_image()
             return self.get_images()
         finally:
-            remove_client(self)
+            await remove_client(self)
 
     async def wait_for_image(self):
         while self.state != Status.IMAGE_READY:
@@ -268,6 +340,41 @@ class ProgressMessage:
             files.append(discord.File(self.image, filename="progress.jpg"))
         if not self.msg:
             self.msg = await self.followup.send(message, files=files, wait=True)
+        else:
+            await self.msg.edit(message, files=files)
+
+        # Cache what we sent last so we don't resend the same image.
+        self.last_sent_image = self.image
+
+    async def delete_message(self):
+        if self.msg:
+            await self.msg.delete()
+
+
+class TeaProgressMessage:
+    last_update = time.time()
+    msg = None
+    image = None
+    last_sent_image = None
+
+    def __init__(self, channel):
+        super().__init__()
+        self.channel = channel
+
+    async def send_progress(self, percentage):
+        if time.time() - self.last_update >= 0.5:
+            progress = math.floor(percentage * 10)
+            complete = "▓" * progress
+            incomplete = "░" * (10 - progress)
+            await self.send_message(complete + incomplete)
+            self.last_update = time.time()
+
+    async def send_message(self, message):
+        files = []
+        if self.image and self.image != self.last_sent_image:
+            files.append(discord.File(self.image, filename="progress.jpg"))
+        if not self.msg:
+            self.msg = await self.channel.send(message, files=files)
         else:
             await self.msg.edit(message, files=files)
 

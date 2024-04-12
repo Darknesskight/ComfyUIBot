@@ -2,6 +2,7 @@ import time
 import math
 import discord
 
+
 class ProgressMessage:
     last_update = time.time()
     msg = None

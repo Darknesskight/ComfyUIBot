@@ -18,10 +18,11 @@ class Status(Enum):
     IMAGE_READY = 4
     DONE = 5
 
+
 async def glitch(
     ctx: discord.ApplicationContext | discord.Interaction,
     image: discord.Attachment,
-    view
+    view,
 ):
     await ctx.response.defer(invisible=False)
     try:
@@ -30,9 +31,9 @@ async def glitch(
         options = {
             "image": base64.b64encode(imageBytes).decode(),
         }
-        
+
         rendered_template = templateEnv.get_template("glitch.j2").render(**options)
-        
+
         message = f"{ctx.user.mention} here is your glitched image!"
 
         promptJson = json.loads(rendered_template)
@@ -98,7 +99,6 @@ class GlitchJob:
 
             if message["type"] == "executing":
                 await self.on_executing(data)
-
 
     async def on_execution_start(self, data):
         if data["prompt_id"] != self.prompt_id:
