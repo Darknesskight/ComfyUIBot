@@ -1,3 +1,4 @@
+from collections.abc import Coroutine
 from settings import templateEnv
 import discord
 import io
@@ -20,39 +21,26 @@ class Status(Enum):
 
 
 async def upscale(
-    ctx: discord.ApplicationContext | discord.Interaction,
     image: discord.Attachment,
-    view,
+    progress_callback: Coroutine[float, io.BytesIO, None]
 ):
-    await ctx.response.defer(invisible=False)
-    # try:
-    #     imageBytes = await image.read()
+    imageBytes = await image.read()
 
-    #     options = {
-    #         "image": base64.b64encode(imageBytes).decode(),
-    #     }
+    options = {
+        "image": base64.b64encode(imageBytes).decode(),
+    }
 
-    #     rendered_template = templateEnv.get_template("upscale.j2").render(**options)
+    rendered_template = templateEnv.get_template("upscale.j2").render(**options)
 
-    #     message = f"{ctx.user.mention} here is your upsclaed image!"
+    promptJson = json.loads(rendered_template)
+    job = UpscaleJob(promptJson, progress_callback)
 
-    #     promptJson = json.loads(rendered_template)
-    #     progress_msg = ProgressMessage(ctx.followup)
-    #     job = UpscaleJob(promptJson, progress_msg)
+    images = await job.run()
 
-    #     images = await job.run()
+    for node_id in images:
+        for image_data in images[node_id]:
+            return io.BytesIO(image_data)
 
-    #     await progress_msg.send_message("Upscale complete. Uploading now.")
-
-    #     for node_id in images:
-    #         for image_data in images[node_id]:
-    #             file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
-    #             await ctx.channel.send(message, file=file, view=view)
-    #             await progress_msg.delete_message()
-
-    # except Exception as e:
-    #     print(e)
-    #     await ctx.followup.send("Unable to upscale image. Please see log for details")
 
 
 class UpscaleJob:
@@ -61,19 +49,19 @@ class UpscaleJob:
     msg = None
     last_update = time.time()
 
-    def __init__(self, prompt, progress_msg):
+    def __init__(self, prompt, progress_callback):
         super().__init__()
         self.prompt = prompt
-        self.progress_msg = progress_msg
+        self.progress_callback = progress_callback
 
     async def run(self):
-        add_client(self)
+        await add_client(self)
         try:
             self.send_prompt()
             await self.wait_for_image()
             return self.get_images()
         finally:
-            remove_client(self)
+            await remove_client(self)
 
     async def wait_for_image(self):
         while self.state != Status.IMAGE_READY:
@@ -100,6 +88,9 @@ class UpscaleJob:
             if message["type"] == "executing":
                 await self.on_executing(data)
 
+            if message["type"] == "progress":
+                await self.on_progress(data)
+
     async def on_execution_start(self, data):
         if data["prompt_id"] != self.prompt_id:
             return
@@ -110,6 +101,11 @@ class UpscaleJob:
             return
         if data["node"] is None:
             self.state = Status.IMAGE_READY
+
+    async def on_progress(self, data):
+        if self.state != Status.RUNNING:
+            return
+        await self.progress_callback(data["value"] / data["max"], None)
 
     def get_images(self):
         output_images = {}

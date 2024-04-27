@@ -18,14 +18,14 @@ openai_truncate_limit = 1500
 sd_models: List[OptionChoice] = []
 sdxl_models: List[OptionChoice] = []
 
+samplers: List[OptionChoice] = []
+schedulers: List[OptionChoice] = []
+
 sd_select_models: List[SelectOption] = []
 sdxl_select_models: List[SelectOption] = []
 
 sd_loras: List[OptionChoice] = []
 sdxl_loras: List[OptionChoice] = []
-
-sd_select_loras: List[SelectOption] = []
-sdxl_select_loras: List[SelectOption] = []
 
 upscale_latent: List[str] = ["None"]
 
@@ -78,26 +78,20 @@ def set_comfy_settings(system_info):
                     lora.replace("sd-1.5\\", "").replace(".safetensors", ""), lora
                 )
             )
-            sd_select_loras.append(
-                SelectOption(
-                    label=lora.replace("sd-1.5\\", "").replace(".safetensors", ""),
-                    value=lora,
-                )
-            )
         elif lora.startswith("sdxl-1.0\\"):
             sdxl_loras.append(
                 OptionChoice(
                     lora.replace("sdxl-1.0\\", "").replace(".safetensors", ""), lora
                 )
             )
-            sdxl_select_loras.append(
-                SelectOption(
-                    label=lora.replace("sdxl-1.0\\", "").replace(".safetensors", ""),
-                    value=lora,
-                )
-            )
         else:
             print(f"Unknown lora type for {lora}")
+
+    system_samplers: List[str] = system_info["KSampler"]["input"]["required"]["sampler_name"][0]
+    samplers.extend(OptionChoice(sampler, sampler) for sampler in system_samplers)
+
+    system_scheduler: List[str] = system_info["KSampler"]["input"]["required"]["scheduler"][0]
+    schedulers.extend(OptionChoice(scheduler, scheduler) for scheduler in system_scheduler)
 
     upscale_latent.extend(
         system_info["LatentUpscale"]["input"]["required"]["upscale_method"][0]

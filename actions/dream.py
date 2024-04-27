@@ -30,6 +30,8 @@ async def dream(
         "prompt": prompt,
         "negative_prompt": sd_options.negative_prompt,
         "cfg": sd_options.cfg,
+        "sampler": sd_options.sampler,
+        "scheduler": sd_options.scheduler,
         "steps": sd_options.steps,
         "model": sd_options.model,
         "width": sd_options.width,

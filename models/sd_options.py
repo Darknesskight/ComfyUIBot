@@ -22,6 +22,8 @@ class SDOptions:
             steps: int,
             seed: int,
             cfg: float,
+            sampler: str,
+            scheduler: str,
             lora: str,
             lora_two: str,
             lora_three: str,
@@ -39,6 +41,8 @@ class SDOptions:
         self.steps = steps
         self.seed = seed or random.randint(1, 4294967294)
         self.cfg = cfg
+        self.sampler = sampler
+        self.scheduler = scheduler
         self.lora = lora
         self.lora_two = lora_two
         self.lora_three = lora_three

@@ -81,6 +81,8 @@ class TeaCogMessageQueue:
                     steps=None,
                     seed=None,
                     cfg=None,
+                    sampler=None,
+                    scheduler=None,
                     lora=None,
                     lora_two=None,
                     lora_three=None,

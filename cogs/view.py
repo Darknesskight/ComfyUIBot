@@ -1,8 +1,8 @@
 import discord
-from api.job_db import get_job, add_job
-from utils.message_utils import ProgressMessenger, format_image_message
+from api.job_db import get_job
+from dispatchers.dream_dispatcher import dream_dispatcher
+from dispatchers.upscale_dispatcher import upscale_dispatcher
 from settings import sdxl_select_models, sd_select_models
-from actions.dream import dream
 from actions.upscale import upscale
 from actions.glitch import glitch
 from models.sd_options import SDOptions
@@ -19,7 +19,7 @@ class ComfySDView(discord.ui.View):
         self.add_item(RedrawButton(self, "sd_button_redraw"))
         self.add_item(EditButton(self, "sd_button_edit"))
         self.add_item(SpoilorButton(self, "sd_button_spoiler"))
-        # self.add_item(UpscaleButton(self, "sd_button_upscale"))
+        self.add_item(UpscaleButton(self, "sd_button_upscale"))
         self.add_item(DeleteButton(self, "sd_button_delete"))
         # self.add_item(GlitchButton(self, "sd_button_glitch"))
         self.add_item(ModelSelect(sd_select_models, self, "sd_model_select"))
@@ -32,7 +32,7 @@ class ComfySDXLView(discord.ui.View):
         self.add_item(RedrawButton(self, "sdxl_button_redraw"))
         self.add_item(EditButton(self, "sdxl_button_edit"))
         self.add_item(SpoilorButton(self, "sdxl_button_spoiler"))
-        # self.add_item(UpscaleButton(self, "sdxl_button_upscale"))
+        self.add_item(UpscaleButton(self, "sdxl_button_upscale"))
         self.add_item(DeleteButton(self, "sdxl_button_delete"))
         # self.add_item(GlitchButton(self, "sdxl_button_glitch"))
         self.add_item(ModelSelect(sdxl_select_models, self, "sdxl_model_select"))
@@ -70,24 +70,10 @@ class EditModal(discord.ui.Modal):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.sd_options.prompt = self.children[0].value
         self.sd_options.negative_prompt = self.children[1].value
-
-        progress_messenger = ProgressMessenger(interaction.channel)
-
-        job_id = add_job(self.sd_options)
-        await interaction.response.send_message("Queued image please wait", delete_after=10)
-        image = await dream(
-            self.sd_options,
-            progress_messenger.on_progress
-        )
-        await progress_messenger.on_complete("Drawing Complete. Uploading now.")        
-        image_file = discord.File(fp=image, filename="output.png")
-        await interaction.channel.send(
-            format_image_message(interaction.user, self.sd_options, job_id),
-            file=image_file, view=self.parent_view
-        )
-        await progress_messenger.delete_message()
+        await dream_dispatcher(self.sd_options, interaction.followup, interaction.channel, interaction.user, self.parent_view)
 
 class ServerPromptModal(discord.ui.Modal):
     def __init__(self, server_prompt, on_submit) -> None:
@@ -148,20 +134,7 @@ class ModelSelect(discord.ui.Select):
 
         sd_options = get_job(job_id)
         sd_options.model = self.values[0]
-        progress_messenger = ProgressMessenger(interaction.channel)
-
-        job_id = add_job(sd_options)
-        await interaction.response.send_message("Queued image please wait", delete_after=10)
-        image = await dream(
-            sd_options,
-            progress_messenger.on_progress
-        )
-        await progress_messenger.on_complete("Drawing Complete. Uploading now.")        
-        image_file = discord.File(fp=image, filename="output.png")
-        await interaction.channel.send(
-            format_image_message(interaction.user, sd_options, job_id),
-            file=image_file, view=self.parent_view
-        )
+        await dream_dispatcher(sd_options, interaction.followup, interaction.channel, interaction.user, self.parent_view)
 
 class EditButton(discord.ui.Button):
     def __init__(self, parent_view, custom_id):
@@ -184,7 +157,7 @@ class RedrawButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
-        interaction.response.defer()
+        await interaction.response.defer()
         job_id_search = re.findall(
             "Job ID ``(\d+)``", interaction.message.content, re.IGNORECASE
         )
@@ -192,23 +165,7 @@ class RedrawButton(discord.ui.Button):
 
         sd_options = get_job(job_id)
         sd_options.seed = random.randint(1, 4294967294)
-
-        progress_messenger = ProgressMessenger(interaction.channel)
-
-        job_id = add_job(sd_options)
-
-        await interaction.response.send_message("Queued image please wait", delete_after=10)
-        image = await dream(
-            sd_options,
-            progress_messenger.on_progress
-        )
-        await progress_messenger.on_complete("Drawing Complete. Uploading now.")
-        image_file = discord.File(fp=image, filename="output.png")
-        await interaction.channel.send(
-            format_image_message(interaction.user, sd_options, job_id),
-            file=image_file, view=self.parent_view
-        )
-        await progress_messenger.delete_message()
+        await dream_dispatcher(sd_options, interaction.followup, interaction.channel, interaction.user, self.parent_view)
 
 class SpoilorButton(discord.ui.Button):
     def __init__(self, parent_view, custom_id):
@@ -271,12 +228,13 @@ class UpscaleButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         attachments = interaction.message.attachments
         if len(attachments) != 1:
             await interaction.followup.send("Unable to upscale image.")
             return
 
-        await upscale(interaction, attachments[0], UpscaleView())
+        await upscale_dispatcher(attachments[0], interaction.followup, interaction.channel, interaction.user, UpscaleView())
 
 
 class GlitchButton(discord.ui.Button):

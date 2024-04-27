@@ -9,16 +9,18 @@ async def init_model_db():
                CREATE TABLE IF NOT EXISTS model_defaults (
                id INTEGER PRIMARY KEY AUTOINCREMENT,
                model TEXT NOT NULL,
-               prompt_template TEXT NOT NULL,
+               prompt_template TEXT,
                negative_prompt TEXT,
                width INTEGER,
                height INTEGER,
                steps INTEGER,
                cfg REAL,
-               hires INTEGER,
+               sampler TEXT,
+               scheduler TEXT,
+               hires TEXT,
                hires_strength REAL,
 
-                UNIQUE(model)
+               UNIQUE(model)
             );
                """
         )
@@ -30,14 +32,16 @@ async def init_model_db():
                model TEXT NOT NULL,
                prompt_template TEXT NOT NULL,
                negative_prompt TEXT,
-               width INTEGER,
-               height INTEGER,
-               steps INTEGER,
-               cfg REAL,
-               hires INTEGER,
-               hires_strength REAL,
+               width INTEGER NOT NULL,
+               height INTEGER NOT NULL,
+               steps INTEGER NOT NULL,
+               cfg REAL NOT NULL,
+               sampler TEXT NOT NULL,
+               scheduler TEXT NOT NULL,
+               hires TEXT NOT NULL,
+               hires_strength REAL NOT NULL,
 
-                UNIQUE(sd_type)
+               UNIQUE(sd_type)
             );
                """
         )
@@ -62,12 +66,12 @@ async def get_sd_default(sd_type):
             return dict(row) if row is not None else dict()
 
 
-async def upsert_model_default(model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength):
+async def upsert_model_default(model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength):
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute(
             """
-            INSERT INTO model_defaults (model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO model_defaults (model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(model) DO UPDATE SET
                 prompt_template=excluded.prompt_template,
                 negative_prompt=excluded.negative_prompt,
@@ -75,19 +79,21 @@ async def upsert_model_default(model, prompt_template, negative_prompt, width, h
                 height=excluded.height,
                 steps=excluded.steps,
                 cfg=excluded.cfg,
+                sampler=excluded.sampler,
+                scheduler=excluded.scheduler,
                 hires=excluded.hires,
                 hires_strength=excluded.hires_strength;
             """,
-            (model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength)
+            (model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength)
         )
         await db.commit()
 
-async def upsert_sd_default(sd_type, model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength):
+async def upsert_sd_default(sd_type, model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength):
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute(
             """
-            INSERT INTO sd_defaults (sd_type, model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sd_defaults (sd_type, model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(sd_type) DO UPDATE SET
                 model=excluded.model,
                 prompt_template=excluded.prompt_template,
@@ -96,10 +102,12 @@ async def upsert_sd_default(sd_type, model, prompt_template, negative_prompt, wi
                 height=excluded.height,
                 steps=excluded.steps,
                 cfg=excluded.cfg,
+                sampler=excluded.sampler,
+                scheduler=excluded.scheduler,
                 hires=excluded.hires,
                 hires_strength=excluded.hires_strength;
             """,
-            (sd_type, model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength)
+            (sd_type, model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength)
         )
         await db.commit()
 

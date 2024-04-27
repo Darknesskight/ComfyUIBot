@@ -2,6 +2,7 @@ import time
 import math
 import discord
 import textwrap
+from models.sd_options import SDOptions
 
 
 class ProgressMessenger:
@@ -33,7 +34,7 @@ class ProgressMessenger:
 
     async def on_complete(self, message):
             if self.channel_message is None:
-                self.channel_message = await self.channel.send(message, wait=True)
+                self.channel_message = await self.channel.send(message)
             else:
                 await self.channel_message.edit(message)
 
@@ -41,12 +42,13 @@ class ProgressMessenger:
          if self.channel_message:
              await self.channel_message.delete()
 
-def format_image_message(user, sd_options, job_id):
+def format_image_message(user, sd_options: SDOptions, job_id):
      return textwrap.dedent(
           f"""\
                 {user.mention} here is your image!
                 Prompt: ``{sd_options.prompt}``
                 Model ``{sd_options.model}``
+                Sampler ``{sd_options.sampler}`` - Scheduler ``{sd_options.scheduler}``
                 CFG ``{sd_options.cfg}`` - Steps: ``{sd_options.steps}`` - Seed ``{sd_options.seed}``
                 Size ``{sd_options.width}``x``{sd_options.height}`` Job ID ``{job_id}``
           """)

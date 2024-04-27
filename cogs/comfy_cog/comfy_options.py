@@ -1,6 +1,6 @@
 from discord import option
 import functools
-from settings import size_range, upscale_latent
+from settings import size_range, upscale_latent, samplers, schedulers
 import discord
 
 
@@ -74,6 +74,20 @@ def draw_options(
             min_value=1,
             max_value=13,
             required=False
+        )
+        @option(
+            "sampler",
+            str,
+            description="Sampler to use for the drawing",
+            required=False,
+            choices=samplers
+        )
+        @option(
+            "scheduler",
+            str,
+            description="Scheduler to use for the drawing",
+            required=False,
+            choices=schedulers
         )
         @option(
             "seed",
@@ -178,6 +192,20 @@ def default_options(models):
             min_value=1,
             max_value=13,
             required=True
+        )
+        @option(
+            "sampler",
+            str,
+            description="Sampler to use for the drawing",
+            required=True,
+            choices=samplers
+        )
+        @option(
+            "scheduler",
+            str,
+            description="Scheduler to use for the drawing",
+            required=True,
+            choices=schedulers
         )
         @option(
             "hires",

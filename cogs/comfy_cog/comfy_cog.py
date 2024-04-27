@@ -7,12 +7,10 @@ from settings import (
     sdxl_loras,
 )
 from .comfy_options import draw_options, default_options
-from actions.dream import dream
-from cogs.view import ComfySDView, ComfySDXLView
 from api.model_db import upsert_model_default, upsert_sd_default, init_model_db
-from api.job_db import add_job
 from models.sd_options import SDType, SDOptions
-from utils.message_utils import ProgressMessenger, format_image_message
+from cogs.view import ComfySDView, ComfySDXLView
+from dispatchers.dream_dispatcher import dream_dispatcher
 
 
 class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images."):
@@ -32,6 +30,8 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         steps,
         seed,
         cfg,
+        sampler,
+        scheduler,
         lora,
         lora_two,
         lora_three,
@@ -50,25 +50,16 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
             steps=steps,
             seed=seed,
             cfg=cfg,
+            sampler=sampler,
+            scheduler=scheduler,
             lora=lora,
             lora_two=lora_two,
             lora_three=lora_three,
             hires=hires,
             hires_strength=hires_strength
         )
-        progress_messenger = ProgressMessenger(ctx.channel)
-        job_id = add_job(sd_options)
-
-        await ctx.followup.send("Generating Image", delete_after=10)
-        image = await dream(sd_options, progress_messenger.on_progress)
-        await progress_messenger.on_complete("Drawing Complete. Uploading now.") 
-        image_file = discord.File(fp=image, filename="output.png")
-        await ctx.channel.send(
-            format_image_message(ctx.user, sd_options, job_id),
-            file=image_file, view=ComfySDView()
-        )
-        await progress_messenger.delete_message()
-
+        await dream_dispatcher(sd_options, ctx.followup, ctx.channel, ctx.user, ComfySDView())
+        
     @draw.command(
         name="sdxl", description="Create an image using Stable Diffusion XL 1.0"
     )
@@ -84,6 +75,8 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         steps,
         seed,
         cfg,
+        sampler,
+        scheduler,
         lora,
         lora_two,
         lora_three,
@@ -102,25 +95,15 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
             steps=steps,
             seed=seed,
             cfg=cfg,
+            sampler=sampler,
+            scheduler=scheduler,
             lora=lora,
             lora_two=lora_two,
             lora_three=lora_three,
             hires=hires,
             hires_strength=hires_strength
         )
-        progress_messenger = ProgressMessenger(ctx.channel)
-        job_id = add_job(sd_options)
-
-        await ctx.followup.send("Generating Image", delete_after=10)
-        image = await dream(sd_options, progress_messenger.on_progress)
-        await progress_messenger.on_complete("Drawing Complete. Uploading now.")        
-        image_file = discord.File(fp=image, filename="output.png")
-        await ctx.channel.send(
-            format_image_message(ctx.user, sd_options, job_id),
-            file=image_file, view=ComfySDXLView()
-        )
-        await progress_messenger.delete_message()
-
+        await dream_dispatcher(sd_options, ctx.followup, ctx.channel, ctx.user, ComfySDXLView())
 
     @defaults.command(
         name="sd", description="Set defaults for sd models"
@@ -137,11 +120,13 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         height,
         steps,
         cfg,
+        sampler,
+        scheduler,
         hires,
         hires_strength,
     ):
         await ctx.response.defer(invisible=False)
-        await upsert_sd_default(SDType.SD.value, model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength)
+        await upsert_sd_default(SDType.SD.value, model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength)
         await ctx.followup.send("Completed")
 
     @defaults.command(
@@ -159,11 +144,13 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         height,
         steps,
         cfg,
+        sampler,
+        scheduler,
         hires,
         hires_strength,
     ):
         await ctx.response.defer(invisible=False)
-        await upsert_sd_default(SDType.SDXL.value, model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength)
+        await upsert_sd_default(SDType.SDXL.value, model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength)
         await ctx.followup.send("Completed")
 
     @defaults.command(
@@ -181,11 +168,13 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
         height,
         steps,
         cfg,
+        sampler,
+        scheduler,
         hires,
         hires_strength,
     ):
         await ctx.response.defer(invisible=False)
-        await upsert_model_default(model, prompt_template, negative_prompt, width, height, steps, cfg, hires, hires_strength)
+        await upsert_model_default(model, prompt_template, negative_prompt, width, height, steps, cfg, sampler, scheduler, hires, hires_strength)
         await ctx.followup.send("Completed")
 
     @commands.Cog.listener()
