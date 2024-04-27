@@ -5,9 +5,9 @@ from settings import bot_token, set_comfy_settings
 from api.comfy_api import get_system_info
 from api.comfy_websocket import wsrun
 from api.job_db import init_db
-from bot.tea_cog import TeaCog
-from bot.view import ComfySDView, ComfySDXLView, UpscaleView
-from bot.civitai_cog import CivitaiCog
+from cogs.tea_cog.tea_cog import TeaCog
+from cogs.view import ComfySDView, ComfySDXLView, UpscaleView
+from cogs.civitai_cog.civitai_cog import CivitaiCog
 
 logging.basicConfig(level=logging.INFO)
 intents = discord.Intents.default()
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     init_db()
     set_comfy_settings(get_system_info())
 
-    from bot.comfy_cog import ComfyCog
+    from cogs.comfy_cog.comfy_cog import ComfyCog
 
     bot = discord.Bot(intents=intents)
 

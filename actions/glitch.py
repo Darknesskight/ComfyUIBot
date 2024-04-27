@@ -8,7 +8,6 @@ import asyncio
 import time
 from api.comfy_api import get_history, queue_prompt, get_image
 import base64
-from bot.utils import ProgressMessage
 
 
 class Status(Enum):
@@ -25,34 +24,34 @@ async def glitch(
     view,
 ):
     await ctx.response.defer(invisible=False)
-    try:
-        imageBytes = await image.read()
+    # try:
+    #     imageBytes = await image.read()
 
-        options = {
-            "image": base64.b64encode(imageBytes).decode(),
-        }
+    #     options = {
+    #         "image": base64.b64encode(imageBytes).decode(),
+    #     }
 
-        rendered_template = templateEnv.get_template("glitch.j2").render(**options)
+    #     rendered_template = templateEnv.get_template("glitch.j2").render(**options)
 
-        message = f"{ctx.user.mention} here is your glitched image!"
+    #     message = f"{ctx.user.mention} here is your glitched image!"
 
-        promptJson = json.loads(rendered_template)
-        progress_msg = ProgressMessage(ctx.followup)
-        job = GlitchJob(promptJson, progress_msg)
+    #     promptJson = json.loads(rendered_template)
+    #     progress_msg = ProgressMessage(ctx.followup)
+    #     job = GlitchJob(promptJson, progress_msg)
 
-        images = await job.run()
+    #     images = await job.run()
 
-        await progress_msg.send_message("Glitching complete. Uploading now.")
+    #     await progress_msg.send_message("Glitching complete. Uploading now.")
 
-        for node_id in images:
-            for image_data in images[node_id]:
-                file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
-                await ctx.channel.send(message, file=file, view=view)
-                await progress_msg.delete_message()
+    #     for node_id in images:
+    #         for image_data in images[node_id]:
+    #             file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
+    #             await ctx.channel.send(message, file=file, view=view)
+    #             await progress_msg.delete_message()
 
-    except Exception as e:
-        print(e)
-        await ctx.followup.send("Unable to glitch image. Please see log for details")
+    # except Exception as e:
+    #     print(e)
+    #     await ctx.followup.send("Unable to glitch image. Please see log for details")
 
 
 class GlitchJob:

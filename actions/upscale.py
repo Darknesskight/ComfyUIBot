@@ -8,7 +8,7 @@ import asyncio
 import time
 from api.comfy_api import get_history, queue_prompt, get_image
 import base64
-from bot.utils import ProgressMessage
+# from bot.utils import ProgressMessage
 
 
 class Status(Enum):
@@ -25,34 +25,34 @@ async def upscale(
     view,
 ):
     await ctx.response.defer(invisible=False)
-    try:
-        imageBytes = await image.read()
+    # try:
+    #     imageBytes = await image.read()
 
-        options = {
-            "image": base64.b64encode(imageBytes).decode(),
-        }
+    #     options = {
+    #         "image": base64.b64encode(imageBytes).decode(),
+    #     }
 
-        rendered_template = templateEnv.get_template("upscale.j2").render(**options)
+    #     rendered_template = templateEnv.get_template("upscale.j2").render(**options)
 
-        message = f"{ctx.user.mention} here is your upsclaed image!"
+    #     message = f"{ctx.user.mention} here is your upsclaed image!"
 
-        promptJson = json.loads(rendered_template)
-        progress_msg = ProgressMessage(ctx.followup)
-        job = UpscaleJob(promptJson, progress_msg)
+    #     promptJson = json.loads(rendered_template)
+    #     progress_msg = ProgressMessage(ctx.followup)
+    #     job = UpscaleJob(promptJson, progress_msg)
 
-        images = await job.run()
+    #     images = await job.run()
 
-        await progress_msg.send_message("Upscale complete. Uploading now.")
+    #     await progress_msg.send_message("Upscale complete. Uploading now.")
 
-        for node_id in images:
-            for image_data in images[node_id]:
-                file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
-                await ctx.channel.send(message, file=file, view=view)
-                await progress_msg.delete_message()
+    #     for node_id in images:
+    #         for image_data in images[node_id]:
+    #             file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
+    #             await ctx.channel.send(message, file=file, view=view)
+    #             await progress_msg.delete_message()
 
-    except Exception as e:
-        print(e)
-        await ctx.followup.send("Unable to upscale image. Please see log for details")
+    # except Exception as e:
+    #     print(e)
+    #     await ctx.followup.send("Unable to upscale image. Please see log for details")
 
 
 class UpscaleJob:

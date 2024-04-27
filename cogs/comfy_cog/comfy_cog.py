@@ -6,9 +6,9 @@ from settings import (
     sd_loras,
     sdxl_loras,
 )
-from bot.comfy_options import draw_options, default_options
+from .comfy_options import draw_options, default_options
 from actions.dream import dream
-from bot.view import ComfySDView, ComfySDXLView
+from cogs.view import ComfySDView, ComfySDXLView
 from api.model_db import upsert_model_default, upsert_sd_default, init_model_db
 from api.job_db import add_job
 from models.sd_options import SDType, SDOptions

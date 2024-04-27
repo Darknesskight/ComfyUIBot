@@ -1,7 +1,7 @@
 from discord.ext import commands
 import discord
 from actions.search import search
-from bot.civitai_options import civitai_options
+from .civitai_options import civitai_options
 
 
 class CivitaiCog(

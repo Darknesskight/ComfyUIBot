@@ -7,7 +7,7 @@ from actions.dream import dream
 from api.job_db import add_job
 from models.sd_options import SDOptions, SDType
 from utils.message_utils import ProgressMessenger, format_image_message
-from bot.view import ComfySDXLView
+from cogs.view import ComfySDXLView
 from PIL import Image
 import base64
 import io

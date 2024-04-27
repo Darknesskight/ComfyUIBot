@@ -9,8 +9,8 @@ from api.chat_history_db import (
     get_server_prompt,
     get_user_prompt,
 )
-from bot.tea_cog_message_queue import TeaCogMessageQueue
-from bot.view import ServerPromptModal, UserPromptModal
+from .tea_cog_message_queue import TeaCogMessageQueue
+from cogs.view import ServerPromptModal, UserPromptModal
 
 
 MAX_LENGTH = 1500
