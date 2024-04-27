@@ -1,16 +1,13 @@
-from settings import templateEnv, sd_loras, sdxl_loras
-from api.job_db import add_job
-import random
-import discord
-import textwrap
+from collections.abc import Coroutine
+from settings import templateEnv, sd_loras, sdxl_loras, sd_template, sdxl_template
 import io
 import json
 from api.comfy_websocket import add_client, remove_client
+from models.sd_options import SDOptions, SDType
 from enum import Enum
 import asyncio
 import time
 from api.comfy_api import get_history, queue_prompt, get_image
-import math
 import re
 
 
@@ -23,211 +20,74 @@ class Status(Enum):
 
 
 async def dream(
-    ctx: discord.ApplicationContext | discord.Interaction,
-    template,
-    view,
-    prompt,
-    negative_prompt,
-    model,
-    width,
-    height,
-    steps,
-    seed,
-    cfg,
-    lora=None,
-    lora_two=None,
-    lora_three=None,
-    hires=None,
-    hires_strength=0.6,
+    sd_options: SDOptions,
+    progress_callback: Coroutine[float, io.BytesIO, None]
 ):
-    await ctx.response.defer(invisible=False)
-    try:
-        if hires == "None":
-            hires = None
+    prompt, loras = extract_loras(sd_options.prompt)
+    template = sd_template if sd_options.sd_type == SDType.SD else sdxl_template
 
-        options = {
-            "template": template,
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "cfg": cfg,
-            "steps": steps,
-            "model": model,
-            "width": width,
-            "height": height,
-            "hires": hires,
-            "hires_strength": hires_strength,
-            "seed": seed or random.randint(1, 4294967294),
-        }
-
-        rendered_template = process_template(
-            template, options, lora, lora_two, lora_three
-        )
-        print(rendered_template)
-
-        model_display_name = options["model"].replace(".safetensors", "")
-        job_id = add_job(options)
-        message = textwrap.dedent(
-            f"""\
-                {ctx.user.mention} here is your image!
-                Prompt: ``{options["prompt"]}``
-                Model ``{model_display_name}``
-                CFG ``{options["cfg"]}`` - Steps: ``{options["steps"]}`` - Seed ``{options["seed"]}``
-                Size ``{options["width"]}``x``{options["height"]}`` Job ID ``{job_id}``
-            """
-        )
-
-        promptJson = json.loads(rendered_template)
-        progress_msg = ProgressMessage(ctx.followup)
-        job = DrawJob(promptJson, progress_msg)
-
-        images = await job.run()
-
-        await progress_msg.send_message("Drawing complete. Uploading now.")
-
-        for node_id in images:
-            for image_data in images[node_id]:
-                file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
-                await ctx.channel.send(message, file=file, view=view)
-                await progress_msg.delete_message()
-
-    except Exception as e:
-        print(e)
-        await ctx.followup.send("Unable to create image. Please see log for details")
-
-
-async def tea_dream(
-    message: discord.Message,
-    template,
-    view,
-    prompt,
-    negative_prompt,
-    model,
-    width,
-    height,
-    steps,
-    seed,
-    cfg,
-    lora=None,
-    lora_two=None,
-    lora_three=None,
-    hires=None,
-    hires_strength=0.6,
-):
-    try:
-        if hires == "None":
-            hires = None
-
-        options = {
-            "template": template,
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "cfg": cfg,
-            "steps": steps,
-            "model": model,
-            "width": width,
-            "height": height,
-            "hires": hires,
-            "hires_strength": hires_strength,
-            "seed": seed or random.randint(1, 4294967294),
-        }
-
-        rendered_template = process_template(
-            template, options, lora, lora_two, lora_three
-        )
-        print(rendered_template)
-
-        model_display_name = options["model"].replace(".safetensors", "")
-        job_id = add_job(options)
-        response_message = textwrap.dedent(
-            f"""\
-                {message.author.mention} here is your image!
-                Prompt: ``{options["prompt"]}``
-                Model ``{model_display_name}``
-                CFG ``{options["cfg"]}`` - Steps: ``{options["steps"]}`` - Seed ``{options["seed"]}``
-                Size ``{options["width"]}``x``{options["height"]}`` Job ID ``{job_id}``
-            """
-        )
-
-        promptJson = json.loads(rendered_template)
-        progress_msg = TeaProgressMessage(message.channel)
-        job = DrawJob(promptJson, progress_msg)
-
-        images = await job.run()
-
-        await progress_msg.send_message("Drawing complete. Uploading now.")
-
-        for node_id in images:
-            for image_data in images[node_id]:
-                file = discord.File(fp=io.BytesIO(image_data), filename="output.png")
-                await message.channel.send(response_message, file=file, view=view)
-                await progress_msg.delete_message()
-
-    except Exception as e:
-        print(e)
-        await message.channel.send("Unable to create image. Please see log for details")
-
-
-def process_template(template, options, lora, lora_two, lora_three):
-    template_options = {}
-    template_options.update(options)
-
-    loras, prompt_w_loras, clean_prompt = parse_loras(
-        options["prompt"], lora, lora_two, lora_three
-    )
-    template_options["prompt"] = clean_prompt
-    options["prompt"] = prompt_w_loras
-    template_options["loras"] = loras
+    options = {
+        "prompt": prompt,
+        "negative_prompt": sd_options.negative_prompt,
+        "cfg": sd_options.cfg,
+        "steps": sd_options.steps,
+        "model": sd_options.model,
+        "width": sd_options.width,
+        "height": sd_options.height,
+        "hires": None if sd_options.hires == "None" else sd_options.hires,
+        "hires_strength": sd_options.hires_strength,
+        "seed": sd_options.seed,
+        "loras": loras,
+    }
 
     if options["hires"]:
-        template_options["width"] = round_to_multiple(options["width"] / 2, 4)
-        template_options["height"] = round_to_multiple(options["height"] / 2, 4)
-        template_options["hires_width"] = options["width"]
-        template_options["hires_height"] = options["height"]
+        options["hires_width"] = options["width"]
+        options["hires_height"] = options["height"]
+        options["width"] = round_to_multiple(options["width"] / 2, 4)
+        options["height"] = round_to_multiple(options["height"] / 2, 4)
 
-    print(template_options)
-    return templateEnv.get_template(template).render(**template_options)
+    rendered_template = templateEnv.get_template(template).render(**options)
+    print(rendered_template)
+    promptJson = json.loads(rendered_template)
+    job = DrawJob(promptJson, progress_callback)
+
+    images = await job.run()
+
+    for node_id in images:
+        for image_data in images[node_id]:
+            return io.BytesIO(image_data)
 
 
 def round_to_multiple(number, multiple):
     return multiple * round(number / multiple)
 
 
-def parse_loras(prompt, lora_one, lora_two, lora_three):
+def extract_loras(prompt):
     clean_prompt = prompt
     lora_regex = "(lora:\S+:\d+\.?\d*)"
     matches = re.findall(lora_regex, prompt)
 
-    loras = []
+    prompt_loras = []
     for lora in matches:
         clean_prompt = clean_prompt.replace(lora, "")
         lora_segs = lora.split(":")
-        loras.append({"name": lora_segs[1], "strength": lora_segs[2]})
-
-    if lora_one and lora_one != "None":
-        loras.append({"name": lora_one, "strength": 0.85})
-    if lora_two and lora_two != "None":
-        loras.append({"name": lora_two, "strength": 0.85})
-    if lora_three and lora_three != "None":
-        loras.append({"name": lora_three, "strength": 0.85})
+        prompt_loras.append({
+            "name": lora_segs[1], "strength": lora_segs[2]
+        })
 
     # clean up lora list.
-    clean_loras = []
-    for lora in loras:
-        for lora_item in [*sd_loras, *sdxl_loras]:
-            if lora["name"] == lora_item.name or lora["name"] == lora_item.value:
-                lora["name"] = lora_item.value
-                lora["clean_name"] = lora_item.name
+    loras = []
+    for lora in prompt_loras:
+        for known_lora in [*sd_loras, *sdxl_loras]:
+            if lora["name"] == known_lora.name or lora["name"] == known_lora.value:
+                loras.append({
+                    "name": known_lora.value,
+                    "strength": lora.strength
+                })
                 break
-        if lora.get("clean_name"):
-            clean_loras.append(lora)
 
     clean_prompt = clean_prompt.strip()
-    string_loras = " ".join(
-        f'lora:{lora["clean_name"]}:{lora["strength"]}' for lora in clean_loras
-    )
-    prompt_w_loras = f"{clean_prompt} {string_loras}".strip()
-
-    return clean_loras, prompt_w_loras, clean_prompt
+    return clean_prompt, loras
 
 
 class DrawJob:
@@ -236,10 +96,11 @@ class DrawJob:
     msg = None
     last_update = time.time()
 
-    def __init__(self, prompt, progress_msg):
+    def __init__(self, prompt, progress_callback):
         super().__init__()
         self.prompt = prompt
-        self.progress_msg = progress_msg
+        self.progress_callback = progress_callback
+        self.progress_image = None
 
     async def run(self):
         await add_client(self)
@@ -267,7 +128,7 @@ class DrawJob:
         # Handle preview image.
         if isinstance(ws_message, bytes) and self.state == Status.RUNNING:
             image_buffer = ws_message[8:]
-            self.progress_msg.image = io.BytesIO(image_buffer)
+            self.progress_image = io.BytesIO(image_buffer)
 
         # Handle normal messages
         if isinstance(ws_message, str):
@@ -291,13 +152,13 @@ class DrawJob:
     async def on_progress(self, data):
         if self.state != Status.RUNNING:
             return
-        await self.progress_msg.send_progress(data["value"] / data["max"])
+        await self.progress_callback(data["value"] / data["max"], self.progress_image)
 
     async def on_executing(self, data):
         if data["prompt_id"] != self.prompt_id:
             return
         if data["node"] is None:
-            await self.progress_msg.send_progress(1)
+            await self.progress_callback(1, self.progress_image)
             self.state = Status.IMAGE_READY
 
     def get_images(self):
@@ -314,73 +175,3 @@ class DrawJob:
                     images_output.append(image_data)
             output_images[node_id] = images_output
         return output_images
-
-
-class ProgressMessage:
-    last_update = time.time()
-    msg = None
-    image = None
-    last_sent_image = None
-
-    def __init__(self, followup):
-        super().__init__()
-        self.followup = followup
-
-    async def send_progress(self, percentage):
-        if time.time() - self.last_update >= 0.5:
-            progress = math.floor(percentage * 10)
-            complete = "▓" * progress
-            incomplete = "░" * (10 - progress)
-            await self.send_message(complete + incomplete)
-            self.last_update = time.time()
-
-    async def send_message(self, message):
-        files = []
-        if self.image and self.image != self.last_sent_image:
-            files.append(discord.File(self.image, filename="progress.jpg"))
-        if not self.msg:
-            self.msg = await self.followup.send(message, files=files, wait=True)
-        else:
-            await self.msg.edit(message, files=files)
-
-        # Cache what we sent last so we don't resend the same image.
-        self.last_sent_image = self.image
-
-    async def delete_message(self):
-        if self.msg:
-            await self.msg.delete()
-
-
-class TeaProgressMessage:
-    last_update = time.time()
-    msg = None
-    image = None
-    last_sent_image = None
-
-    def __init__(self, channel):
-        super().__init__()
-        self.channel = channel
-
-    async def send_progress(self, percentage):
-        if time.time() - self.last_update >= 0.5:
-            progress = math.floor(percentage * 10)
-            complete = "▓" * progress
-            incomplete = "░" * (10 - progress)
-            await self.send_message(complete + incomplete)
-            self.last_update = time.time()
-
-    async def send_message(self, message):
-        files = []
-        if self.image and self.image != self.last_sent_image:
-            files.append(discord.File(self.image, filename="progress.jpg"))
-        if not self.msg:
-            self.msg = await self.channel.send(message, files=files)
-        else:
-            await self.msg.edit(message, files=files)
-
-        # Cache what we sent last so we don't resend the same image.
-        self.last_sent_image = self.image
-
-    async def delete_message(self):
-        if self.msg:
-            await self.msg.delete()

@@ -1,5 +1,6 @@
 import sqlite3
 import json
+from models.sd_options import SDOptions
 
 _conn = sqlite3.connect("job.db")
 
@@ -10,15 +11,15 @@ def init_db():
     )
 
 
-def add_job(data):
+def add_job(sd_options: SDOptions):
     c = _conn.cursor()
-    c.execute("INSERT INTO job (data) VALUES (?)", (json.dumps(data),))
+    c.execute("INSERT INTO job (data) VALUES (?)", (sd_options.to_json(),))
     _conn.commit()
 
     return c.lastrowid
 
 
-def get_job(id):
+def get_job(id: str) -> SDOptions:
     c = _conn.cursor()
     c.execute("SELECT data FROM job WHERE id=?", (id,))
-    return json.loads(c.fetchone()[0])
+    return SDOptions.from_json(c.fetchone()[0])

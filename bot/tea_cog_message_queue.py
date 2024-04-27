@@ -1,15 +1,12 @@
 import asyncio
 from discord import Message, Bot
+import discord
 from api.openai_api import send_message
 from api.tea_db import get_channel_ids, is_user_opt_out
-from actions.dream import tea_dream
-from settings import (
-    default_sdxl_model,
-    default_sdxl_negs,
-    sdxl_template,
-    default_steps,
-    default_cfg,
-)
+from actions.dream import dream
+from api.job_db import add_job
+from models.sd_options import SDOptions, SDType
+from utils.message_utils import ProgressMessenger, format_image_message
 from bot.view import ComfySDXLView
 from PIL import Image
 import base64
@@ -72,21 +69,41 @@ class TeaCogMessageQueue:
 
     async def _process_image_queue(self):
         while True:
+            prompt, message = await self.image_queue.get()
             try:
-                prompt, message = await self.image_queue.get()
-                await tea_dream(
-                    message,
-                    sdxl_template,
-                    ComfySDXLView(),
-                    prompt,
-                    default_sdxl_negs,
-                    default_sdxl_model,
-                    1024,
-                    1024,
-                    default_steps,
-                    None,
-                    default_cfg,
+                sd_options = await SDOptions.create(
+                    sd_type=SDType.SDXL,
+                    prompt=prompt,
+                    negative_prompt=None,
+                    model=None,
+                    width=None,
+                    height=None,
+                    steps=None,
+                    seed=None,
+                    cfg=None,
+                    lora=None,
+                    lora_two=None,
+                    lora_three=None,
+                    hires=None,
+                    hires_strength=None
                 )
+                progress_messenger = ProgressMessenger(message.channel)
+
+                job_id = add_job(sd_options)
+                image = await dream(
+                    sd_options,
+                    progress_messenger.on_progress
+                )
+                await progress_messenger.on_complete("Drawing Complete. Uploading now.")        
+                image_file = discord.File(fp=image, filename="output.png")
+                await message.channel.send(
+                    format_image_message(message.author, sd_options, job_id),
+                    file=image_file, view=ComfySDXLView()
+                )
+                await progress_messenger.delete_message()
+            except Exception as e:
+                print(e)
+                await message.channel.send("Unable to create image. Please see log for details")
             finally:
                 self.image_queue.task_done()  # signals that the message has been processed
 
