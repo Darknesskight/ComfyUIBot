@@ -84,7 +84,7 @@ def extract_loras(prompt):
             if lora["name"] == known_lora.name or lora["name"] == known_lora.value:
                 loras.append({
                     "name": known_lora.value,
-                    "strength": lora.strength
+                    "strength": lora["strength"]
                 })
                 break
 

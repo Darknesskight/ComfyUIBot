@@ -11,8 +11,8 @@ server_ip = os.getenv("COMFY_IP")
 client_id = str(uuid.uuid4())
 bot_token = os.getenv("BOT_TOKEN")
 openai_api_key = os.getenv("OPENAI_API_KEY")
-openai_model = "gpt-4-vision-preview"
-openai_truncate_limit = 1500
+openai_model = "gpt-4o"
+openai_truncate_limit = 1250
 
 
 sd_models: List[OptionChoice] = []

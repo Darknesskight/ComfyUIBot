@@ -52,7 +52,7 @@ async def send_message(server_id, user_id, username, prompt, b64_image):
             + "\n"
             + f"Here are items {username} wants you to remember\n{user_prompt}\nWhen interacting with {username} keep those items in mind."
         )
-    print(system_prompt)
+    print(server_prompt + "\n" + user_prompt)
     chat_history = await get_chat_history(server_id)
     messages = [{"role": role, "content": message} for message, role in chat_history]
     if b64_image:

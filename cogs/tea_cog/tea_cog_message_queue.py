@@ -2,10 +2,11 @@ import asyncio
 from discord import Message, Bot
 import discord
 from api.openai_api import send_message
-from api.tea_db import get_channel_ids, is_user_opt_out
+from api.tea_db import get_guild_autoreply, is_user_opt_out
 from actions.dream import dream
 from api.job_db import add_job
 from models.sd_options import SDOptions, SDType
+from models.autoreply import GuildAutoReply
 from utils.message_utils import ProgressMessenger, format_image_message
 from cogs.view import ComfySDXLView
 from PIL import Image
@@ -39,31 +40,39 @@ class TeaCogMessageQueue:
                         b64_image = self._get_message_image(await attachment.read())
                         break
 
-                if await self._should_process_message(message):
+                guild_autoreply = await get_guild_autoreply(message.guild.id)
+                if await self._should_process_message(message, guild_autoreply):
                     async with message.channel.typing():
                         username = str(message.author.display_name)
-                        formatted_message = f"{username}: {message.clean_content}"
-                        response = self._remove_username_prefix(
-                            await send_message(
-                                message.guild.id,
-                                message.author.id,
-                                username,
-                                formatted_message,
-                                b64_image,
-                            ),
+
+                        cleaned_message = self._remove_message_prefix(message.clean_content, guild_autoreply.prefix)
+                        formatted_message = f"{username}: {cleaned_message}"
+
+                        # Get response from AI.
+                        response = await send_message(
+                            message.guild.id,
+                            message.author.id,
                             username,
+                            formatted_message,
+                            b64_image,
                         )
+                        response = self._remove_username_prefix(response, username)
+                        response = self._remove_everyone(response)
+
+                        # If AI requests for IMAGE generation handle it.
                         parsed_response = response.split("IMAGE:")
                         if len(parsed_response) > 1:
                             prompt = parsed_response[1]
                             await self.image_queue.put((prompt, message))
+
+                        # Send AI response to channel
                         if parsed_response[0].strip():
                             await self._send_response(
                                 message.channel,
-                                self._remove_username_prefix(
-                                    parsed_response[0], username
-                                ),
+                                parsed_response[0]
                             )
+            except Exception as e:
+                print(e)
             finally:
                 self.message_queue.task_done()  # signals that the message has been processed
 
@@ -109,14 +118,17 @@ class TeaCogMessageQueue:
             finally:
                 self.image_queue.task_done()  # signals that the message has been processed
 
-    async def _should_process_message(self, message: Message):
-        channel_ids = await get_channel_ids(message.guild.id)
+    async def _should_process_message(self, message: Message, guild_auto_reply: GuildAutoReply):
         user_opted_out = await is_user_opt_out(message.author.name)
-        allowed_channel = message.channel.id in channel_ids
+
+        allowed_channel = message.channel.id == guild_auto_reply.channel_id
+        has_prefix = message.content.startswith(guild_auto_reply.prefix)
+        channel_message_allowed = allowed_channel and (has_prefix if guild_auto_reply.reverse_check else not has_prefix)
+
         was_mentioned = (
             self.bot.user.mentioned_in(message) and not message.mention_everyone
         )
-        return (allowed_channel or was_mentioned) and not user_opted_out
+        return (channel_message_allowed or was_mentioned) and not user_opted_out
 
     def _remove_username_prefix(self, response: str, username: str) -> str:
         username_lower = username.lower()
@@ -124,6 +136,14 @@ class TeaCogMessageQueue:
         if response_start.startswith((username_lower + ". ", username_lower + ": ")):
             response = response[len(username) + 2 :]
         return response
+    
+    def _remove_everyone(self, response: str) -> str:
+        return response.replace("@everyone", "<BAD BOT>")
+
+    def _remove_message_prefix(self, message: str, prefix: str) -> str:
+        if message.startswith(prefix):
+            return message[len(prefix):].lstrip()
+        return message
 
     async def _send_response(self, channel, response):
         if len(response) > MAX_LENGTH:

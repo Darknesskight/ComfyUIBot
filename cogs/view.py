@@ -127,6 +127,7 @@ class ModelSelect(discord.ui.Select):
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         job_id_search = re.findall(
             "Job ID ``(\d+)``", interaction.message.content, re.IGNORECASE
         )
@@ -177,9 +178,6 @@ class SpoilorButton(discord.ui.Button):
         print(interaction.message.mentions[0])
         print(interaction.message.mentions[0] == interaction.user)
         message = interaction.message.content
-        await interaction.message.edit(
-            message + "\n# Converting message to spoiler", attachments=[]
-        )
 
         files = []
         for attachment in interaction.message.attachments:
@@ -187,6 +185,10 @@ class SpoilorButton(discord.ui.Button):
             files.append(
                 discord.File(fp=io.BytesIO(file), filename="output.png", spoiler=True)
             )
+
+        await interaction.message.edit(
+            message + "\n# Converting message to spoiler", attachments=[]
+        )
 
         await interaction.message.edit(
             message, files=files, view=self.parent_view, attachments=[]

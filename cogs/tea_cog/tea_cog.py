@@ -1,5 +1,7 @@
 from discord.ext import commands
-from discord import Message, Bot, ApplicationContext, slash_command
+from discord import Message, Bot, ApplicationContext, slash_command, option
+import functools
+from models.autoreply import GuildAutoReply
 from api.tea_db import init_tea_db, toggle_guild_autoreply, toggle_user_optout
 from api.chat_history_db import (
     init_chat_db,
@@ -16,6 +18,25 @@ from cogs.view import ServerPromptModal, UserPromptModal
 MAX_LENGTH = 1500
 
 
+def is_owner_or_admin():
+    def decorator(func):
+
+        @functools.wraps(func)
+        async def wrapper(self, ctx: ApplicationContext, *args, **kwargs):
+            # Permission checks
+            if await ctx.bot.is_owner(ctx.author):
+                return await func(self, ctx, *args, **kwargs)
+            if ctx.author == ctx.guild.owner:
+                return await func(self, ctx, *args, **kwargs)
+            if ctx.author.guild_permissions.administrator:
+                return await func(self, ctx, *args, **kwargs)
+
+            # If check fails
+            await ctx.respond("You do not have the necessary permissions to run this command.")
+        return wrapper
+    return decorator
+
+
 class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
     def __init__(self, bot: Bot):
         self.bot = bot
@@ -25,13 +46,31 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
         name="autoreply",
         description="Enable Tea autoreply for this channel. Rerun in the same channel to disable",
     )
-    async def autoreply(self, ctx: ApplicationContext):
+    @is_owner_or_admin()
+    @option(
+        "prefix",
+        str,
+        description="Prefix to use for messages to get ignored",
+        max_length=1,
+        default="!",
+    )
+    @option(
+        "reverse_check",
+        bool,
+        description="Set to true to require prefix for message to be processed",
+        default=False,
+    )
+    async def autoreply(self, ctx: ApplicationContext, prefix, reverse_check):
         await ctx.response.defer()
-        guild_autoreplying = await toggle_guild_autoreply(ctx.guild.id, ctx.channel.id)
+
+        guild_autoreply = GuildAutoReply(ctx.channel.id, prefix, reverse_check)
+
+        guild_autoreplying = await toggle_guild_autoreply(ctx.guild.id, guild_autoreply)
+        addon_message = f"Use the prefix `{guild_autoreply.prefix}` at the start of your message to have Tea {'see' if guild_autoreply.reverse_check else 'ignore'} your message."
 
         if guild_autoreplying:
             await ctx.followup.send(
-                f"Tea will now autoreply in this channel. Rerun to disable."
+                f"Tea will now autoreply in this channel. Rerun to disable. {addon_message}"
             )
         else:
             await ctx.followup.send(
@@ -55,14 +94,14 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
             )
 
     @slash_command(name="cleartea", description="Clear Tea's history")
-    @commands.has_guild_permissions(manage_messages=True)
+    @is_owner_or_admin()
     async def clear_history(self, ctx: ApplicationContext):
         await ctx.response.defer(invisible=False)
         await clear_chat_history(ctx.guild.id)
         await ctx.followup.send("Tea's history has been cleared.")
 
     @slash_command(name="serverprompt", description="Add/Update a custom server prompt")
-    @commands.has_guild_permissions(manage_messages=True)
+    @is_owner_or_admin()
     async def server_prompt(self, ctx: ApplicationContext):
         async def on_modal_submit(prompt):
             await update_server_prompt(ctx.guild.id, prompt)
@@ -90,7 +129,6 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
         if (
             message.author.bot
             or not message.content.strip()
-            or message.content.startswith("!")
         ):
             return
 

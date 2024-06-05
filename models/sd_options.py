@@ -72,6 +72,7 @@ class SDOptions:
         return self
 
     async def set_defaults(self):
+        print(self.model)
         sd_default = await get_sd_default(self.sd_type.value)
         model_default = await get_model_default(self.model or sd_default.get("model"))
         for param in self.__dict__:
