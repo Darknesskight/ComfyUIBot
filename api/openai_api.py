@@ -20,13 +20,12 @@ async def get_system_prompt():
 async def truncate_history(server_id, max_tokens):
     # Get the full chat history for the server
     chat_history = await get_chat_history(server_id)
-    messages = [message for message, _ in chat_history]
+    messages = [message or "" for message, _ in chat_history]
 
     # Convert the chat history into a single string to count tokens
     history_str = " ".join(messages)
     encoding = tiktoken.encoding_for_model(openai_model)
     tokens = len(encoding.encode(history_str))
-
     # If the token limit is exceeded, remove the oldest messages
     while tokens > max_tokens and chat_history:
         # Remove the oldest entry (first in the list)
@@ -35,7 +34,7 @@ async def truncate_history(server_id, max_tokens):
         await delete_single_chat(server_id, oldest_message[0], oldest_message[1])
 
         # Recalculate the token count
-        history_str = " ".join([message for message, _ in chat_history])
+        history_str = " ".join([message or "" for message, _ in chat_history])
         tokens = len(encoding.encode(history_str))
 
 
@@ -54,13 +53,13 @@ async def send_message(server_id, user_id, username, prompt, b64_image):
         )
     print(server_prompt + "\n" + user_prompt)
     chat_history = await get_chat_history(server_id)
-    messages = [{"role": role, "content": message} for message, role in chat_history]
+    messages = [{"role": role, "content": message or ""} for message, role in chat_history]
     if b64_image:
         messages.append(
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": prompt or ""},
                     {
                         "type": "image_url",
                         "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
@@ -69,11 +68,12 @@ async def send_message(server_id, user_id, username, prompt, b64_image):
             }
         )
     else:
-        messages.append({"role": "user", "content": prompt})
+        messages.append({"role": "user", "content": prompt or ""})
+    print("MODEL: " + "gpt-4o" if b64_image else openai_model)
     response = await client.chat.completions.create(
-        model=openai_model,
+        model="gpt-4o" if b64_image else openai_model,
         messages=[{"role": "system", "content": system_prompt}] + messages,
-        max_tokens=4096,
+        max_completion_tokens=4096,
     )
     assistant_message = response.choices[0].message.content
     print(response.choices[0])

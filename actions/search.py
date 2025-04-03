@@ -51,7 +51,7 @@ def create_search_embed(item, model_version_index=0):
 
     model_version = item["modelVersions"][model_version_index]
     images = model_version["images"]
-    creator = item["creator"]
+    creator = item.get("creator", None)
     stats = item["stats"]
 
     version = model_version["name"]
@@ -83,10 +83,11 @@ def create_search_embed(item, model_version_index=0):
     embed.add_field(name="Tags", value=tags, inline=False)
     if trigger_words:
         embed.add_field(name="Trigger Words", value=trigger_words, inline=False)
-    embed.set_image(url=image or discord.Embed.Empty)
-    embed.set_author(
-        name=creator["username"], icon_url=creator["image"] or discord.Embed.Empty
-    )
+    embed.set_image(url=image or None)
+    if creator:
+        embed.set_author(
+            name=creator["username"], icon_url=creator["image"] or discord.Embed.Empty
+        )
     embed.set_footer(text=f"1/{len(images)}")
 
     return embed
@@ -121,7 +122,8 @@ def filter_images(images):
 
     filtered_images = []
     for image in images:
-        if image["type"] == "image" and image["nsfw"] in ["None", "Soft"]:
+        print(image)
+        if image["type"] == "image":
             filtered_images.append(image)
 
     return filtered_images

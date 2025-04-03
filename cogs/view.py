@@ -1,5 +1,5 @@
 import discord
-from api.job_db import get_job
+from api.job_db import get_job, add_fluxjob, get_fluxjob, add_videojob, get_videojob
 from dispatchers.dream_dispatcher import dream_dispatcher
 from dispatchers.upscale_dispatcher import upscale_dispatcher
 from settings import sdxl_select_models, sd_select_models
@@ -9,6 +9,10 @@ from models.sd_options import SDOptions
 import random
 import re
 import io
+import replicate
+import urllib.request
+import textwrap
+from io import BytesIO
 
 
 # View used for SD drawing
@@ -36,6 +40,23 @@ class ComfySDXLView(discord.ui.View):
         self.add_item(DeleteButton(self, "sdxl_button_delete"))
         # self.add_item(GlitchButton(self, "sdxl_button_glitch"))
         self.add_item(ModelSelect(sdxl_select_models, self, "sdxl_model_select"))
+
+
+# View used for SDXL drawing
+class FluxView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(FluxEditButton(self, "flux_button_edit"))
+        self.add_item(SpoilorButton(self, "flux_button_spoiler"))
+        self.add_item(DeleteButton(self, "flux_button_delete"))
+
+# View used for SDXL drawing
+class VideoView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(SpoilorButton(self, "video_button_spoiler"))
+        self.add_item(DeleteButton(self, "video_button_delete"))
+
 
 
 # View used for upscale
@@ -116,6 +137,154 @@ class UserPromptModal(discord.ui.Modal):
         await interaction.response.send_message("User prompt updated.")
 
 
+class FluxPromptModal(discord.ui.Modal):
+    def __init__(self, prompt) -> None:
+        super().__init__(title="Prompt")
+        self.prompt = prompt
+
+        self.add_item(
+            discord.ui.InputText(
+                label="Prompt",
+                value=prompt or "",
+                required=False,
+                max_length=4000,
+                style=discord.InputTextStyle.long,
+            )
+        )
+
+    async def callback(self, interaction):
+        await interaction.response.defer()
+
+        prompt = self.children[0].value
+        followup = await interaction.followup.send("Request queued. Please Wait.")
+        output = await replicate.async_run(
+            "black-forest-labs/flux-dev",
+            input={
+                "prompt": prompt,
+                "guidance": 3.5,
+                "num_outputs": 2,
+                "aspect_ratio": "1:1",
+                "output_format": "webp",
+                "output_quality": 100,
+                "prompt_strength": 1,
+                "num_inference_steps": 30,
+                "disable_safety_checker": True
+            }
+        )
+        job_id = add_fluxjob(prompt)
+        await followup.delete()
+        files = []
+        for idx, url in enumerate(output):
+            with urllib.request.urlopen(url) as response:
+                files.append(
+                    discord.File(
+                        fp=io.BytesIO(response.read()),
+                        filename=f"output-{idx}.png")
+                    )
+
+        await interaction.channel.send(
+            textwrap.dedent(
+                f"""\
+{interaction.user.mention} here is your image!
+```
+{prompt[:1000] + (prompt[1000:] and '...')}
+```
+Job ID ``{job_id}``
+                """),
+            files=files,
+            view=FluxView()
+        )
+
+class VideoPromptModal(discord.ui.Modal):
+    def __init__(self, prompt, image: discord.Attachment, resolution: str, orientation: str) -> None:
+        super().__init__(title="Prompt")
+        self.prompt = prompt
+        self.image = image
+        self.resolution = resolution
+        self.orientation = orientation
+
+        self.add_item(
+            discord.ui.InputText(
+                label="Prompt",
+                value=prompt or "",
+                required=False,
+                max_length=4000,
+                style=discord.InputTextStyle.long,
+            )
+        )
+
+    async def callback(self, interaction):
+        await interaction.response.defer()
+
+        prompt = self.children[0].value
+        followup = await interaction.followup.send("Request queued. Please Wait.")
+        if self.image:
+            image_bytes = await self.image.read()
+            model = "wavespeedai/wan-2.1-i2v-720p" if self.resolution == "720p" else "wavespeedai/wan-2.1-i2v-480p"
+            max_area_map = {
+                ("720p", "portrait"): "720x1280",
+                ("720p", "landscape"): "1280x720",
+                ("480p", "portrait"): "480x832",
+                ("480p", "landscape"): "832x480",
+            }
+            max_area = max_area_map[(self.resolution, self.orientation)]
+            print(self.resolution)
+            print(self.orientation)
+            print(model)
+            print(max_area)
+            output = await replicate.async_run(
+                model,
+                input={
+                    "image": BytesIO(image_bytes),
+                    "prompt": prompt,
+                    "max_area": max_area,
+                    "fast_mode": "Balanced",
+                    "lora_scale": 1,
+                    "num_frames": 81,
+                    "sample_shift": 5,
+                    "sample_steps": 30,
+                    "frames_per_second": 16,
+                    "sample_guide_scale": 5
+                }
+            )
+        else:
+            output = await replicate.async_run(
+                "wavespeedai/wan-2.1-t2v-480p",
+                input={
+                    "prompt": prompt,
+                    "fast_mode": "Balanced",
+                    "num_frames": 81,
+                    "aspect_ratio": "16:9",
+                    "sample_shift": 5,
+                    "sample_steps": 30,
+                    "frames_per_second": 16,
+                    "sample_guide_scale": 5
+                }
+            )
+        job_id = add_videojob(prompt)
+        await followup.delete()
+        files = []
+        with urllib.request.urlopen(output) as response:
+            files.append(
+                discord.File(
+                    fp=io.BytesIO(response.read()),
+                    filename=f"output.mp4")
+                )
+
+        await interaction.channel.send(
+            textwrap.dedent(
+                f"""\
+{interaction.user.mention} here is your video!
+```
+{prompt[:1000] + (prompt[1000:] and '...')}
+```
+Job ID ``{job_id}``
+                """),
+            files=files,
+            view=VideoView()
+        )
+
+
 # Select dropdown for models.
 class ModelSelect(discord.ui.Select):
     def __init__(self, models, parent_view, custom_id):
@@ -150,6 +319,35 @@ class EditButton(discord.ui.Button):
 
         sd_options = get_job(job_id)
         await interaction.response.send_modal(EditModal(sd_options, self.parent_view))
+
+class FluxEditButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="🖋")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        job_id_search = re.findall(
+            "Job ID ``(\d+)``", interaction.message.content, re.IGNORECASE
+        )
+        job_id = job_id_search[-1]
+
+        prompt = get_fluxjob(job_id)
+        await interaction.response.send_modal(FluxPromptModal(prompt))
+
+class VideoEditButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="🖋")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        job_id_search = re.findall(
+            "Job ID ``(\d+)``", interaction.message.content, re.IGNORECASE
+        )
+        job_id = job_id_search[-1]
+
+        prompt = get_videojob(job_id)
+        await interaction.response.send_modal(VideoPromptModal(prompt))
+
 
 
 class RedrawButton(discord.ui.Button):

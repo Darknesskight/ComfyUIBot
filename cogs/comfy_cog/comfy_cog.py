@@ -9,7 +9,7 @@ from settings import (
 from .comfy_options import draw_options, default_options
 from api.model_db import upsert_model_default, upsert_sd_default, init_model_db
 from models.sd_options import SDType, SDOptions
-from cogs.view import ComfySDView, ComfySDXLView
+from cogs.view import ComfySDView, ComfySDXLView, FluxPromptModal, VideoPromptModal
 from dispatchers.dream_dispatcher import dream_dispatcher
 
 
@@ -104,6 +104,54 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
             hires_strength=hires_strength
         )
         await dream_dispatcher(sd_options, ctx.followup, ctx.channel, ctx.user, ComfySDXLView())
+
+    @draw.command(name="flux", description="Create an image using Flux.1 Dev")
+    async def dream_flux(
+        self,
+        ctx: discord.ApplicationContext
+    ):
+        modal = FluxPromptModal("")
+        await ctx.interaction.response.send_modal(modal)
+        
+    @draw.command(name="video", description="Create a video clip")
+    @discord.option(
+        "image",
+        type=discord.SlashCommandOptionType.attachment,
+        default=None,
+        required=False
+    )
+    @discord.option(
+        "resolution",
+        description="Default: 480p",
+        type=str,
+        choices=["480p", "720p"],
+        default="480p",
+        required=False
+    )
+    @discord.option(
+        "orientation",
+        description="Default: portrait",
+        type=str,
+        choices=["portrait", "landscape"],
+        default="portrait",
+        required=False
+    )
+    async def dream_video(
+        self,
+        ctx: discord.ApplicationContext,
+        image,
+        resolution,
+        orientation,
+    ):
+        if image:
+            # Check if Discord detected an image MIME type
+            if not image.content_type or not image.content_type.startswith("image/"):
+                await ctx.respond("Please provide a valid image (PNG, JPG, etc.)", ephemeral=True)
+                return
+
+        modal = VideoPromptModal("", image, resolution, orientation)
+        await ctx.interaction.response.send_modal(modal)
+        
 
     @defaults.command(
         name="sd", description="Set defaults for sd models"

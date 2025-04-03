@@ -80,14 +80,14 @@ def draw_options(
             str,
             description="Sampler to use for the drawing",
             required=False,
-            choices=samplers
+            autocomplete=default_filter(samplers),
         )
         @option(
             "scheduler",
             str,
             description="Scheduler to use for the drawing",
             required=False,
-            choices=schedulers
+            autocomplete=default_filter(schedulers),
         )
         @option(
             "seed",
@@ -156,25 +156,27 @@ def default_options(models):
         @option(
             "prompt_template",
             str,
+            required=False,
             description="Set a template to map prompts to. Use <prompt> for where the user's prompt goes.",
         )
         @option(
             "negative_prompt",
             str,
+            required=False,
             description="Set the default negative prompt to use",
         )
         @option(
             "width",
             int,
             description="Default width",
-            required=True,
+            required=False,
             choices=size_range,
         )
         @option(
             "height",
             int,
             description="Default height",
-            required=True,
+            required=False,
             choices=size_range,
         )
         @option(
@@ -183,42 +185,42 @@ def default_options(models):
             description="Default steps to take to generate the image",
             min_value=1,
             max_value=100,
-            required=True,
+            required=False,
         )
         @option(
             "cfg",
-            int,
+            float,
             description="Default Classifier Free Guidance scale",
             min_value=1,
             max_value=13,
-            required=True
+            required=False,
         )
         @option(
             "sampler",
             str,
             description="Sampler to use for the drawing",
-            required=True,
-            choices=samplers
+            required=False,
+            autocomplete=default_filter(samplers),
         )
         @option(
             "scheduler",
             str,
             description="Scheduler to use for the drawing",
-            required=True,
-            choices=schedulers
+            required=False,
+            autocomplete=default_filter(schedulers),
         )
         @option(
             "hires",
             str,
             description="Default hires setting",
-            required=True,
+            required=False,
             choices=upscale_latent,
         )
         @option(
             "hires_strength",
             float,
             description="Default strength for hires",
-            required=True,
+            required=False,
             min_value=0,
             max_value=1,
         )

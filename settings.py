@@ -11,8 +11,8 @@ server_ip = os.getenv("COMFY_IP")
 client_id = str(uuid.uuid4())
 bot_token = os.getenv("BOT_TOKEN")
 openai_api_key = os.getenv("OPENAI_API_KEY")
-openai_model = "gpt-4o"
-openai_truncate_limit = 1250
+openai_model = "gpt-4o-mini"
+openai_truncate_limit = 10500
 
 
 sd_models: List[OptionChoice] = []
@@ -29,7 +29,7 @@ sdxl_loras: List[OptionChoice] = []
 
 upscale_latent: List[str] = ["None"]
 
-size_range = range(192, 1088, 64)
+size_range = range(192, 1218, 64)
 
 templateLoader = jinja2.FileSystemLoader(searchpath="./templates")
 templateEnv = jinja2.Environment(loader=templateLoader)

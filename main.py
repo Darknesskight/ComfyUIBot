@@ -6,7 +6,7 @@ from api.comfy_api import get_system_info
 from api.comfy_websocket import wsrun
 from api.job_db import init_db
 from cogs.tea_cog.tea_cog import TeaCog
-from cogs.view import ComfySDView, ComfySDXLView, UpscaleView
+from cogs.view import ComfySDView, ComfySDXLView, UpscaleView, FluxView
 from cogs.civitai_cog.civitai_cog import CivitaiCog
 
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +28,7 @@ if __name__ == "__main__":
         bot.add_view(ComfySDView())
         bot.add_view(ComfySDXLView())
         bot.add_view(UpscaleView())
+        bot.add_view(FluxView())
 
     bot.add_cog(ComfyCog())
     bot.add_cog(CivitaiCog())

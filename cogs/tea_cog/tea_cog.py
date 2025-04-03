@@ -119,6 +119,26 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
         modal = UserPromptModal(user_prompt, on_modal_submit)
         await ctx.interaction.response.send_modal(modal)
 
+    @slash_command(name="talk", description="Have Tea talk to you in a VC", guild_ids=[1034985100061966447])
+    async def talk(self, ctx: ApplicationContext):
+        # Ensure the command author is in a voice channel
+        if ctx.author.voice:
+            channel = ctx.author.voice.channel
+            # Join the voice channel
+            await channel.connect()
+            await ctx.respond(f"Joined {channel.name}")
+        else:
+            await ctx.respond("You need to be in a voice channel for me to join.")
+    
+    @slash_command(name="disconnect", description="Have Tea talk to you in a VC", guild_ids=[1034985100061966447])
+    async def disconnect(self, ctx: ApplicationContext):
+        # Ensure the bot is in a voice channel
+        if ctx.voice_client:
+            await ctx.voice_client.disconnect()
+            await ctx.respond("Disconnected from the voice channel.")
+        else:
+            await ctx.respond("I'm not in a voice channel.")
+
     @commands.Cog.listener()
     async def on_ready(self):
         await init_tea_db()
@@ -133,3 +153,21 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
             return
 
         await self.message_queue.queue_message(message)
+
+    @slash_command(name="react", description="Have Tea react to a message")
+    @option(
+        "message_id",
+        str,
+        description="Prefix to use for messages to get ignored",
+    )
+    @option(
+        "emoji",
+        str,
+        description="Set to true to require prefix for message to be processed",
+    )
+    @is_owner_or_admin()
+    async def react(self, ctx: ApplicationContext, message_id, emoji):
+        msg = await ctx.fetch_message(int(message_id))
+        emoji = self.bot.get_emoji(int(emoji))
+        await msg.add_reaction(emoji)
+        await ctx.respond("Done", delete_after=3, ephemeral=True,)

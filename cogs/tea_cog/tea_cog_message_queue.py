@@ -56,7 +56,7 @@ class TeaCogMessageQueue:
                             formatted_message,
                             b64_image,
                         )
-                        response = self._remove_username_prefix(response, username)
+                        response = self._remove_username_prefix(response, "Tea")
                         response = self._remove_everyone(response)
 
                         # If AI requests for IMAGE generation handle it.
@@ -177,5 +177,7 @@ class TeaCogMessageQueue:
 
             compressed_io.seek(0)
             image_base64 = base64.b64encode(compressed_io.getvalue())
+
+            image = Image.open(compressed_io)
 
             return image_base64.decode("utf-8")

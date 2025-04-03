@@ -75,15 +75,20 @@ class SDOptions:
         print(self.model)
         sd_default = await get_sd_default(self.sd_type.value)
         model_default = await get_model_default(self.model or sd_default.get("model"))
+        print(sd_default)
+        print(model_default)
         for param in self.__dict__:
             if getattr(self, param) is None:
-                setattr(self, param, model_default.get(param, sd_default.get(param)))
+                if model_default.get(param) is None:    
+                    setattr(self, param, sd_default.get(param))
+                else:
+                    setattr(self, param, model_default.get(param))
 
     def merge_loras_into_prompt(self):
         loras = [self.lora, self.lora_two, self.lora_three]
         for lora in loras:
             if lora and lora != "None":
-                self.prompt = f'{self.prompt} lora:{lora["name"]}:{lora["strength"]}'
+                self.prompt = f'{self.prompt} lora:{lora}:0.85'
     
     def apply_prompt_template(self):
         if self.prompt_template:
