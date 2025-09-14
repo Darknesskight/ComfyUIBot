@@ -7,6 +7,7 @@ import time
 from enum import Enum
 from api.websocket_subsystem import add_client, remove_client, is_websocket_connected
 from api.comfy_api import get_history, queue_prompt, get_image
+from api.job_tracker import job_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -19,27 +20,60 @@ class Status(Enum):
     DONE = 5
 
 
-class ComfyJob:
-    """Base class for all ComfyUI job types"""
-    
-    def __init__(self, prompt, progress_callback=None):
-        self.prompt = prompt
+class BaseJob:
+    """Base class for all job types"""
+
+    def __init__(self, progress_callback=None):
         self.progress_callback = progress_callback
-        self.prompt_id = -1
         self.state = Status.READY
+        self._registered = False
+
+    async def run(self):
+        """Main execution flow for the job"""
+        logger.info("Job starting")
+
+        # Register job with tracker
+        await job_tracker.register_job(self, self.progress_callback)
+        self._registered = True
+
+        try:
+            self.state = Status.RUNNING
+            result = await self.execute()
+            self.state = Status.DONE
+            return result
+        except Exception as e:
+            logger.error(f"Error in job.run(): {e}")
+            raise
+        finally:
+            # Unregister job with tracker
+            if self._registered:
+                await job_tracker.unregister_job(self)
+
+    async def execute(self):
+        """Override this method in subclasses to implement job-specific logic"""
+        raise NotImplementedError("Subclasses must implement execute method")
+
+
+class ComfyJob(BaseJob):
+    """Base class for all ComfyUI job types"""
+
+    def __init__(self, prompt, progress_callback=None):
+        super().__init__(progress_callback)
+        self.prompt = prompt
+        self.prompt_id = -1
         self.msg = None
         self.last_update = time.time()
         self.progress_image = None
 
-    async def run(self):
-        """Main execution flow for the job"""
-        logger.info(f"Job starting for prompt_id: {self.prompt_id}")
-        
+    async def execute(self):
+        """Main execution flow for ComfyUI jobs"""
+        logger.info(f"ComfyUI job starting for prompt_id: {self.prompt_id}")
+
         # Check if websocket is connected before proceeding
         if not is_websocket_connected():
             logger.error("Websocket is not connected, cannot process image generation")
             raise RuntimeError("Websocket connection not available")
-            
+
         await add_client(self)
         try:
             logger.info("Sending prompt to ComfyUI")
@@ -49,7 +83,7 @@ class ComfyJob:
             logger.info("Image generation completed, retrieving images")
             return await self.get_images()
         except Exception as e:
-            logger.error(f"Error in job.run(): {e}")
+            logger.error(f"Error in ComfyJob.execute(): {e}")
             raise
         finally:
             await remove_client(self)
@@ -116,14 +150,14 @@ class ComfyJob:
         """Handle progress updates"""
         if self.state != Status.RUNNING:
             return
-        
+
         # Rate limiting - only update every 0.5 seconds to prevent spam while staying responsive
         current_time = time.time()
         if current_time - self.last_update < 0.5:
             return
-            
+
         self.last_update = current_time
-        
+
         # Only call progress callback if it exists
         if self.progress_callback:
             await self.progress_callback(data["value"] / data["max"], self.progress_image)
@@ -164,3 +198,18 @@ class ComfyJob:
         except Exception as e:
             logger.error(f"Failed to get images: {e}")
             raise
+
+
+class ReplicateJob(BaseJob):
+    """Job class for Replicate-based tasks (Flux, Video, etc.)"""
+
+    def __init__(self, task_func, progress_callback=None):
+        super().__init__(progress_callback)
+        self.task_func = task_func
+
+    async def execute(self):
+        """Execute the replicate task"""
+        logger.info("Replicate job executing")
+        # For replicate tasks, we don't have progress updates, so we just await the task
+        result = await self.task_func()
+        return result

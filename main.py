@@ -5,6 +5,7 @@ from settings import bot_token, set_comfy_settings
 from api.comfy_api import get_system_info
 from api.websocket_subsystem import start_websocket, stop_websocket
 from api.job_db import init_db
+from api.job_tracker import job_tracker
 from cogs.view import ComfySDView, ComfySDXLView, UpscaleView, FluxView
 from utils.logging_config import setup_logging, get_logger
 
@@ -20,24 +21,18 @@ class ComfyUIBot(discord.Bot):
         super().__init__(*args, **kwargs)
         self.websocket_started = False
 
-    async def setup_hook(self):
-        """Called before the bot starts. Perfect for initialization tasks."""
-        logger.info("Setting up bot...")
-        
-        # Initialize database
+    async def on_ready(self):
+        """Called when the bot is ready"""
+        logger.info(f'{self.user} has connected to Discord!')
+        logger.info(f'Bot is in {len(self.guilds)} guilds')
+
         init_db()
 
-        # Add persistent views
         self.add_view(ComfySDView())
         self.add_view(ComfySDXLView())
         self.add_view(UpscaleView())
         self.add_view(FluxView())
         logger.info("Persistent views added")
-
-    async def on_ready(self):
-        """Called when the bot is ready"""
-        logger.info(f'{self.user} has connected to Discord!')
-        logger.info(f'Bot is in {len(self.guilds)} guilds')
         
         try:
             logger.info("Fetching ComfyUI system info...")
@@ -60,6 +55,13 @@ class ComfyUIBot(discord.Bot):
     async def close(self):
         """Clean shutdown"""
         logger.info("Shutting down bot...")
+
+        # Notify channels about shutdown
+        if job_tracker.get_active_job_count() > 0:
+            await job_tracker.notify_channels(
+                "⚠️ Bot is shutting down. Current jobs will be stopped."
+            )
+
         if self.websocket_started:
             stop_websocket()
         await super().close()
@@ -77,12 +79,17 @@ async def main():
         await bot.start(bot_token)
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt, shutting down...")
-        await bot.close()
     except Exception as e:
         logger.error(f"Bot encountered an error: {e}")
-        await bot.close()
         raise
+    finally:
+        await bot.close()
 
 if __name__ == "__main__":
     # Run the bot with proper async handling
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Received keyboard interrupt at module level, exiting...")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")

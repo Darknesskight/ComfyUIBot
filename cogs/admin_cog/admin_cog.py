@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 async def get_loaded_cogs(ctx: discord.AutocompleteContext):
     """Autocomplete function for cog names"""
     bot = ctx.bot
-    return [cog_name for cog_name in bot.cogs.keys() if cog_name.lower().startswith(ctx.value.lower())]
+    return [ext_name for ext_name in bot.extensions.keys()]
 
 class AdminCog(commands.Cog, name="Admin", description="Admin commands for managing cogs and bot operations"):
     def __init__(self, bot):
@@ -121,48 +121,30 @@ class AdminCog(commands.Cog, name="Admin", description="Admin commands for manag
     @admin.command(name="reload_cog", description="Reload a cog")
     @commands.is_owner()
     @discord.option(
-        "cog_name",
+        "extension",
         description="Name of the cog to reload",
         type=str,
         required=True,
         autocomplete=get_loaded_cogs
     )
-    async def reload_cog(self, ctx: discord.ApplicationContext, cog_name: str):
+    async def reload_cog(self, ctx: discord.ApplicationContext, extension: str):
         """Reload a cog (useful for applying changes without restarting the bot)"""
         await ctx.response.defer()
         
         try:
             # Check if cog exists
-            if cog_name not in self.bot.cogs:
-                await ctx.followup.send(f"Cog `{cog_name}` is not loaded!", ephemeral=True)
+            if extension not in self.bot.extensions:
+                await ctx.followup.send(f"Cog `{extension}` is not loaded!", ephemeral=True)
                 return
             
-            # Get the cog's extension path
-            extension_path = None
-            
-            # Find the extension path by checking all extensions
-            for ext_name in self.bot.extensions.keys():
-                # Check if the extension contains the cog class
-                try:
-                    ext_module = self.bot.extensions[ext_name]
-                    if hasattr(ext_module, cog_name):
-                        extension_path = ext_name
-                        break
-                except:
-                    continue
-            
-            if not extension_path:
-                # Try to construct the path from common patterns
-                extension_path = f"cogs.{cog_name.lower()}_cog.{cog_name.lower()}_cog"
-            
             # Reload the extension
-            self.bot.reload_extension(extension_path)
-            logger.info(f"Successfully reloaded cog: {cog_name}")
-            await ctx.followup.send(f"✅ Successfully reloaded cog: `{cog_name}`")
+            self.bot.reload_extension(extension)
+            logger.info(f"Successfully reloaded cog: {extension}")
+            await ctx.followup.send(f"✅ Successfully reloaded cog: `{extension}`")
             
         except Exception as e:
-            logger.error(f"Failed to reload cog {cog_name}: {e}")
-            await ctx.followup.send(f"❌ Failed to reload cog `{cog_name}`: {str(e)}", ephemeral=True)
+            logger.error(f"Failed to reload cog {extension}: {e}")
+            await ctx.followup.send(f"❌ Failed to reload cog `{extension}`: {str(e)}", ephemeral=True)
 
     @admin.command(name="bot_status", description="Get bot status information")
     @commands.is_owner()

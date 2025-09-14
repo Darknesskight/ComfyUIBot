@@ -149,7 +149,7 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
                 await ctx.respond("Please provide a valid image (PNG, JPG, etc.)", ephemeral=True)
                 return
 
-        modal = VideoPromptModal("", image, resolution, orientation, False)
+        modal = VideoPromptModal("", image, resolution, orientation)
         await ctx.interaction.response.send_modal(modal)
         
 

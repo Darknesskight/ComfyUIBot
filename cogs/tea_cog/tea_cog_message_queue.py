@@ -35,6 +35,7 @@ class TeaCogMessageQueue:
 
     async def _process_message_queue(self):
         while True:
+            message = None
             try:
                 message = await self.message_queue.get()
                 b64_image: str = None
@@ -74,15 +75,29 @@ class TeaCogMessageQueue:
                                 message.channel,
                                 parsed_response[0]
                             )
+            except asyncio.CancelledError:
+                # If we were cancelled, and we got a message, we need to mark it as done
+                if message is not None:
+                    self.message_queue.task_done()
+                # Re-raise the CancelledError to properly exit the coroutine
+                raise
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
             finally:
-                self.message_queue.task_done()  # signals that the message has been processed
+                # Only call task_done() if we actually got a message and weren't cancelled
+                # before getting the message
+                if message is not None and not asyncio.current_task().cancelled():
+                    try:
+                        self.message_queue.task_done()
+                    except ValueError:
+                        # task_done() was already called, ignore
+                        pass
 
     async def _process_image_queue(self):
         while True:
-            prompt, message = await self.image_queue.get()
+            prompt, message = None, None
             try:
+                prompt, message = await self.image_queue.get()
                 sd_options = await SDOptions.create(
                     sd_type=SDType.SDXL,
                     prompt=prompt,
@@ -115,11 +130,25 @@ class TeaCogMessageQueue:
                     file=image_file, view=ComfySDXLView()
                 )
                 await progress_messenger.delete_message()
+            except asyncio.CancelledError:
+                # If we were cancelled, and we got a message, we need to mark it as done
+                if prompt is not None and message is not None:
+                    self.image_queue.task_done()
+                # Re-raise the CancelledError to properly exit the coroutine
+                raise
             except Exception as e:
                 logger.error(f"Error processing image: {e}")
-                await message.channel.send("Unable to create image. Please see log for details")
+                if message is not None:
+                    await message.channel.send("Unable to create image. Please see log for details")
             finally:
-                self.image_queue.task_done()  # signals that the message has been processed
+                # Only call task_done() if we actually got a message and weren't cancelled
+                # before getting the message
+                if prompt is not None and message is not None and not asyncio.current_task().cancelled():
+                    try:
+                        self.image_queue.task_done()
+                    except ValueError:
+                        # task_done() was already called, ignore
+                        pass
 
     async def _should_process_message(self, message: Message, guild_auto_reply: GuildAutoReply):
         user_opted_out = await is_user_opt_out(message.author.name)

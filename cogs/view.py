@@ -12,6 +12,7 @@ import urllib.request
 import textwrap
 from io import BytesIO
 from utils.logging_config import get_logger
+from actions.base_job import ReplicateJob
 
 logger = get_logger(__name__)
 
@@ -158,20 +159,29 @@ class FluxPromptModal(discord.ui.Modal):
 
         prompt = self.children[0].value
         followup = await interaction.followup.send("Request queued. Please Wait.")
-        output = await replicate.async_run(
-            "black-forest-labs/flux-dev",
-            input={
-                "prompt": prompt,
-                "guidance": 3.5,
-                "num_outputs": 2,
-                "aspect_ratio": "1:1",
-                "output_format": "webp",
-                "output_quality": 100,
-                "prompt_strength": 1,
-                "num_inference_steps": 30,
-                "disable_safety_checker": True
-            }
-        )
+
+        # Create a task function for the replicate call
+        async def flux_task():
+            output = await replicate.async_run(
+                "black-forest-labs/flux-dev",
+                input={
+                    "prompt": prompt,
+                    "guidance": 3.5,
+                    "num_outputs": 2,
+                    "aspect_ratio": "1:1",
+                    "output_format": "webp",
+                    "output_quality": 100,
+                    "prompt_strength": 1,
+                    "num_inference_steps": 30,
+                    "disable_safety_checker": True
+                }
+            )
+            return output
+
+        # Create and run the job
+        job = ReplicateJob(flux_task)
+        output = await job.run()
+
         job_id = add_fluxjob(prompt)
         await followup.delete()
         files = []
@@ -197,13 +207,12 @@ Job ID ``{job_id}``
         )
 
 class VideoPromptModal(discord.ui.Modal):
-    def __init__(self, prompt, image: discord.Attachment, resolution: str, orientation: str, pro_mode: bool) -> None:
+    def __init__(self, prompt, image: discord.Attachment, resolution: str, orientation: str) -> None:
         super().__init__(title="Prompt")
         self.prompt = prompt
         self.image = image
         self.resolution = resolution
         self.orientation = orientation
-        self.pro_mode = pro_mode
 
         self.add_item(
             discord.ui.InputText(
@@ -220,28 +229,42 @@ class VideoPromptModal(discord.ui.Modal):
 
         prompt = self.children[0].value
         followup = await interaction.followup.send("Request queued. Please Wait.")
-        if self.image:
-            image_bytes = await self.image.read()
-            output = await replicate.async_run(
-                "wan-video/wan-2.2-i2v-fast" if not self.pro_mode else "wan-video/wan-2.2-i2v-a14b",
-                input={
-                    "image": BytesIO(image_bytes),
-                    "prompt": prompt,
-                    "num_frames": 81,
-                    "resolution": self.resolution 
-                }
-            )
-        else:
-            output = await replicate.async_run(
-                "wan-video/wan-2.2-t2v-fast",
-                input={
-                    "prompt": prompt,
-                    "num_frames": 81,
-                    "resolution": self.resolution,
-                    "aspect_ratio": "16:9" if self.orientation == "landscape"  else "9:16",
-                }
-            )
+
+        # Capture variables for the closure
+        image = self.image
+        resolution = self.resolution
+        orientation = self.orientation
+
+        # Create a task function for the replicate call
+        async def video_task():
+            if image:
+                image_bytes = await image.read()
+                output = await replicate.async_run(
+                    "wan-video/wan-2.2-i2v-fast",
+                    input={
+                        "image": BytesIO(image_bytes),
+                        "prompt": prompt,
+                        "num_frames": 81,
+                        "resolution": resolution
+                    }
+                )
+            else:
+                output = await replicate.async_run(
+                    "wan-video/wan-2.2-t2v-fast",
+                    input={
+                        "prompt": prompt,
+                        "num_frames": 81,
+                        "resolution": resolution,
+                        "aspect_ratio": "16:9" if orientation == "landscape"  else "9:16",
+                    }
+                )
+            return output
+
+        # Create and run the job
         job_id = add_videojob(prompt)
+        job = ReplicateJob(video_task)
+        output = await job.run()
+
         await followup.delete()
         files = []
         with urllib.request.urlopen(output) as response:
@@ -307,7 +330,7 @@ class VideoButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.send_modal(
-            VideoPromptModal("", interaction.message.attachments[0], "480p", None, None)
+            VideoPromptModal("", interaction.message.attachments[0], "480p", None)
         )
 
 class FluxEditButton(discord.ui.Button):
