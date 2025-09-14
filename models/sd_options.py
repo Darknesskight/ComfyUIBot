@@ -2,6 +2,9 @@ from enum import Enum
 import random
 from api.model_db import get_model_default, get_sd_default
 import json
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class SDType(Enum):
     SD = 'sd'
@@ -72,11 +75,11 @@ class SDOptions:
         return self
 
     async def set_defaults(self):
-        print(self.model)
+        logger.debug(f"Setting defaults for model: {self.model}")
         sd_default = await get_sd_default(self.sd_type.value)
         model_default = await get_model_default(self.model or sd_default.get("model"))
-        print(sd_default)
-        print(model_default)
+        logger.debug(f"SD defaults: {sd_default}")
+        logger.debug(f"Model defaults: {model_default}")
         for param in self.__dict__:
             if getattr(self, param) is None:
                 if model_default.get(param) is None:    

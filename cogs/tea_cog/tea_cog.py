@@ -37,7 +37,7 @@ def is_owner_or_admin():
     return decorator
 
 
-class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
+class TeaCog(commands.Cog, name="TeaCog", description="Responds to users and do actions absed on responses."):
     def __init__(self, bot: Bot):
         self.bot = bot
         self.message_queue = TeaCogMessageQueue(bot)
@@ -130,7 +130,7 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
         else:
             await ctx.respond("You need to be in a voice channel for me to join.")
     
-    @slash_command(name="disconnect", description="Have Tea talk to you in a VC", guild_ids=[1034985100061966447])
+    @slash_command(name="disconnect", description="Disconnect Tea from voice channel", guild_ids=[1034985100061966447])
     async def disconnect(self, ctx: ApplicationContext):
         # Ensure the bot is in a voice channel
         if ctx.voice_client:
@@ -158,12 +158,12 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
     @option(
         "message_id",
         str,
-        description="Prefix to use for messages to get ignored",
+        description="The ID of the message to react to",
     )
     @option(
         "emoji",
         str,
-        description="Set to true to require prefix for message to be processed",
+        description="The emoji to react with (as ID for custom emoji)",
     )
     @is_owner_or_admin()
     async def react(self, ctx: ApplicationContext, message_id, emoji):
@@ -171,3 +171,6 @@ class TeaCog(commands.Cog, name="OpenAI", description="Respond to users"):
         emoji = self.bot.get_emoji(int(emoji))
         await msg.add_reaction(emoji)
         await ctx.respond("Done", delete_after=3, ephemeral=True,)
+
+def setup(bot):
+    bot.add_cog(TeaCog(bot))

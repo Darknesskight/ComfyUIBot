@@ -8,7 +8,9 @@ from api.chat_history_db import (
 )
 import tiktoken
 from settings import openai_api_key, openai_model, openai_truncate_limit
+from utils.logging_config import get_logger
 
+logger = get_logger(__name__)
 client = AsyncOpenAI(api_key=openai_api_key)
 
 
@@ -30,7 +32,7 @@ async def truncate_history(server_id, max_tokens):
     while tokens > max_tokens and chat_history:
         # Remove the oldest entry (first in the list)
         oldest_message = chat_history.pop(0)
-        print(oldest_message)
+        logger.debug(f"Removing oldest message: {oldest_message[0][:50]}...")
         await delete_single_chat(server_id, oldest_message[0], oldest_message[1])
 
         # Recalculate the token count
@@ -51,7 +53,8 @@ async def send_message(server_id, user_id, username, prompt, b64_image):
             + "\n"
             + f"Here are items {username} wants you to remember\n{user_prompt}\nWhen interacting with {username} keep those items in mind."
         )
-    print(server_prompt + "\n" + user_prompt)
+    logger.debug(f"System prompt: {server_prompt[:100]}...")
+    logger.debug(f"User prompt: {user_prompt[:100]}...")
     chat_history = await get_chat_history(server_id)
     messages = [{"role": role, "content": message or ""} for message, role in chat_history]
     if b64_image:
@@ -69,14 +72,15 @@ async def send_message(server_id, user_id, username, prompt, b64_image):
         )
     else:
         messages.append({"role": "user", "content": prompt or ""})
-    print("MODEL: " + "gpt-4o" if b64_image else openai_model)
+    model_used = "gpt-4o" if b64_image else openai_model
+    logger.debug(f"Using model: {model_used}")
     response = await client.chat.completions.create(
         model="gpt-4o" if b64_image else openai_model,
         messages=[{"role": "system", "content": system_prompt}] + messages,
         max_completion_tokens=4096,
     )
     assistant_message = response.choices[0].message.content
-    print(response.choices[0])
+    logger.debug(f"Response received, length: {len(assistant_message)} characters")
     await insert_chat_history(server_id, prompt, "user")
     await insert_chat_history(server_id, assistant_message, "assistant")
     await truncate_history(server_id, openai_truncate_limit)

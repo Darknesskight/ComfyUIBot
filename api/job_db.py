@@ -1,5 +1,4 @@
 import sqlite3
-import json
 from models.sd_options import SDOptions
 
 _conn = sqlite3.connect("job.db")

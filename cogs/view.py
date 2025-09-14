@@ -3,8 +3,6 @@ from api.job_db import get_job, add_fluxjob, get_fluxjob, add_videojob, get_vide
 from dispatchers.dream_dispatcher import dream_dispatcher
 from dispatchers.upscale_dispatcher import upscale_dispatcher
 from settings import sdxl_select_models, sd_select_models
-from actions.upscale import upscale
-from actions.glitch import glitch
 from models.sd_options import SDOptions
 import random
 import re
@@ -13,6 +11,9 @@ import replicate
 import urllib.request
 import textwrap
 from io import BytesIO
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # View used for SD drawing
@@ -22,10 +23,10 @@ class ComfySDView(discord.ui.View):
 
         self.add_item(RedrawButton(self, "sd_button_redraw"))
         self.add_item(EditButton(self, "sd_button_edit"))
-        self.add_item(SpoilorButton(self, "sd_button_spoiler"))
+        self.add_item(VideoButton(self, "sd_button_video"))
+        self.add_item(SpoilerButton(self, "sd_button_spoiler"))
         self.add_item(UpscaleButton(self, "sd_button_upscale"))
         self.add_item(DeleteButton(self, "sd_button_delete"))
-        # self.add_item(GlitchButton(self, "sd_button_glitch"))
         self.add_item(ModelSelect(sd_select_models, self, "sd_model_select"))
 
 
@@ -35,10 +36,10 @@ class ComfySDXLView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(RedrawButton(self, "sdxl_button_redraw"))
         self.add_item(EditButton(self, "sdxl_button_edit"))
-        self.add_item(SpoilorButton(self, "sdxl_button_spoiler"))
+        self.add_item(VideoButton(self, "sdxl_button_video"))
+        self.add_item(SpoilerButton(self, "sdxl_button_spoiler"))
         self.add_item(UpscaleButton(self, "sdxl_button_upscale"))
         self.add_item(DeleteButton(self, "sdxl_button_delete"))
-        # self.add_item(GlitchButton(self, "sdxl_button_glitch"))
         self.add_item(ModelSelect(sdxl_select_models, self, "sdxl_model_select"))
 
 
@@ -47,14 +48,14 @@ class FluxView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(FluxEditButton(self, "flux_button_edit"))
-        self.add_item(SpoilorButton(self, "flux_button_spoiler"))
+        self.add_item(SpoilerButton(self, "flux_button_spoiler"))
         self.add_item(DeleteButton(self, "flux_button_delete"))
 
 # View used for SDXL drawing
 class VideoView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SpoilorButton(self, "video_button_spoiler"))
+        self.add_item(SpoilerButton(self, "video_button_spoiler"))
         self.add_item(DeleteButton(self, "video_button_delete"))
 
 
@@ -63,7 +64,7 @@ class VideoView(discord.ui.View):
 class UpscaleView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(SpoilorButton(self, "upscale_button_spoiler"))
+        self.add_item(SpoilerButton(self, "upscale_button_spoiler"))
         self.add_item(DeleteButton(self, "upscale_button_delete"))
 
 
@@ -196,12 +197,13 @@ Job ID ``{job_id}``
         )
 
 class VideoPromptModal(discord.ui.Modal):
-    def __init__(self, prompt, image: discord.Attachment, resolution: str, orientation: str) -> None:
+    def __init__(self, prompt, image: discord.Attachment, resolution: str, orientation: str, pro_mode: bool) -> None:
         super().__init__(title="Prompt")
         self.prompt = prompt
         self.image = image
         self.resolution = resolution
         self.orientation = orientation
+        self.pro_mode = pro_mode
 
         self.add_item(
             discord.ui.InputText(
@@ -220,45 +222,23 @@ class VideoPromptModal(discord.ui.Modal):
         followup = await interaction.followup.send("Request queued. Please Wait.")
         if self.image:
             image_bytes = await self.image.read()
-            model = "wavespeedai/wan-2.1-i2v-720p" if self.resolution == "720p" else "wavespeedai/wan-2.1-i2v-480p"
-            max_area_map = {
-                ("720p", "portrait"): "720x1280",
-                ("720p", "landscape"): "1280x720",
-                ("480p", "portrait"): "480x832",
-                ("480p", "landscape"): "832x480",
-            }
-            max_area = max_area_map[(self.resolution, self.orientation)]
-            print(self.resolution)
-            print(self.orientation)
-            print(model)
-            print(max_area)
             output = await replicate.async_run(
-                model,
+                "wan-video/wan-2.2-i2v-fast" if not self.pro_mode else "wan-video/wan-2.2-i2v-a14b",
                 input={
                     "image": BytesIO(image_bytes),
                     "prompt": prompt,
-                    "max_area": max_area,
-                    "fast_mode": "Balanced",
-                    "lora_scale": 1,
                     "num_frames": 81,
-                    "sample_shift": 5,
-                    "sample_steps": 30,
-                    "frames_per_second": 16,
-                    "sample_guide_scale": 5
+                    "resolution": self.resolution 
                 }
             )
         else:
             output = await replicate.async_run(
-                "wavespeedai/wan-2.1-t2v-480p",
+                "wan-video/wan-2.2-t2v-fast",
                 input={
                     "prompt": prompt,
-                    "fast_mode": "Balanced",
                     "num_frames": 81,
-                    "aspect_ratio": "16:9",
-                    "sample_shift": 5,
-                    "sample_steps": 30,
-                    "frames_per_second": 16,
-                    "sample_guide_scale": 5
+                    "resolution": self.resolution,
+                    "aspect_ratio": "16:9" if self.orientation == "landscape"  else "9:16",
                 }
             )
         job_id = add_videojob(prompt)
@@ -320,6 +300,16 @@ class EditButton(discord.ui.Button):
         sd_options = get_job(job_id)
         await interaction.response.send_modal(EditModal(sd_options, self.parent_view))
 
+class VideoButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="🎥")
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            VideoPromptModal("", interaction.message.attachments[0], "480p", None, None)
+        )
+
 class FluxEditButton(discord.ui.Button):
     def __init__(self, parent_view, custom_id):
         super().__init__(custom_id=custom_id, emoji="🖋")
@@ -366,15 +356,15 @@ class RedrawButton(discord.ui.Button):
         sd_options.seed = random.randint(1, 4294967294)
         await dream_dispatcher(sd_options, interaction.followup, interaction.channel, interaction.user, self.parent_view)
 
-class SpoilorButton(discord.ui.Button):
+class SpoilerButton(discord.ui.Button):
     def __init__(self, parent_view, custom_id):
         super().__init__(custom_id=custom_id, emoji="🕵️")
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        print(interaction.message.mentions[0])
-        print(interaction.message.mentions[0] == interaction.user)
+        logger.debug(f"Spoiler interaction user: {interaction.message.mentions[0]}")
+        logger.debug(f"Same user check: {interaction.message.mentions[0] == interaction.user}")
         message = interaction.message.content
 
         files = []
@@ -435,17 +425,3 @@ class UpscaleButton(discord.ui.Button):
             return
 
         await upscale_dispatcher(attachments[0], interaction.followup, interaction.channel, interaction.user, UpscaleView())
-
-
-class GlitchButton(discord.ui.Button):
-    def __init__(self, parent_view, custom_id):
-        super().__init__(custom_id=custom_id, emoji="🦠")
-        self.parent_view = parent_view
-
-    async def callback(self, interaction: discord.Interaction):
-        attachments = interaction.message.attachments
-        if len(attachments) != 1:
-            await interaction.followup.send("Unable to gltich image.")
-            return
-
-        await glitch(interaction, attachments[0], UpscaleView())

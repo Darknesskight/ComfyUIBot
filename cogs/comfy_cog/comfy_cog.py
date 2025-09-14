@@ -130,7 +130,7 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
     )
     @discord.option(
         "orientation",
-        description="Default: portrait",
+        description="Used if no image is provided. Default: portrait",
         type=str,
         choices=["portrait", "landscape"],
         default="portrait",
@@ -149,7 +149,7 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
                 await ctx.respond("Please provide a valid image (PNG, JPG, etc.)", ephemeral=True)
                 return
 
-        modal = VideoPromptModal("", image, resolution, orientation)
+        modal = VideoPromptModal("", image, resolution, orientation, False)
         await ctx.interaction.response.send_modal(modal)
         
 
@@ -228,3 +228,6 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
     @commands.Cog.listener()
     async def on_ready(self):
         await init_model_db()
+
+def setup(bot):
+    bot.add_cog(ComfyCog())

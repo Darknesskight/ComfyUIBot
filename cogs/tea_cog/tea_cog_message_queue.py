@@ -12,6 +12,9 @@ from cogs.view import ComfySDXLView
 from PIL import Image
 import base64
 import io
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 MAX_LENGTH = 1500
 
@@ -28,7 +31,7 @@ class TeaCogMessageQueue:
         await self.message_queue.put(message)
 
     async def queue_image(self, prompt: str, message: Message):
-        await self.image_queue.put(prompt, message)
+        await self.image_queue.put((prompt, message))
 
     async def _process_message_queue(self):
         while True:
@@ -72,7 +75,7 @@ class TeaCogMessageQueue:
                                 parsed_response[0]
                             )
             except Exception as e:
-                print(e)
+                logger.error(f"Error processing message: {e}")
             finally:
                 self.message_queue.task_done()  # signals that the message has been processed
 
@@ -113,7 +116,7 @@ class TeaCogMessageQueue:
                 )
                 await progress_messenger.delete_message()
             except Exception as e:
-                print(e)
+                logger.error(f"Error processing image: {e}")
                 await message.channel.send("Unable to create image. Please see log for details")
             finally:
                 self.image_queue.task_done()  # signals that the message has been processed
