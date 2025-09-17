@@ -10,13 +10,14 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+admin_user_id = os.getenv("ADMIN_USER_ID")
+
 server_ip = os.getenv("COMFY_IP")
 client_id = str(uuid.uuid4())
 bot_token = os.getenv("BOT_TOKEN")
 openai_api_key = os.getenv("OPENAI_API_KEY")
 openai_model = "gpt-4o-mini"
 openai_truncate_limit = 10500
-
 
 sd_models: List[OptionChoice] = []
 sdxl_models: List[OptionChoice] = []

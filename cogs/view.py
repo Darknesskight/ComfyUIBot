@@ -1,5 +1,5 @@
 import discord
-from api.job_db import get_job, add_fluxjob, get_fluxjob, add_videojob, get_videojob
+from api.job_db import get_job, add_fluxjob, get_fluxjob, add_videojob, get_videojob, add_editjob, get_editjob
 from dispatchers.dream_dispatcher import dream_dispatcher
 from dispatchers.upscale_dispatcher import upscale_dispatcher
 from settings import sdxl_select_models, sd_select_models
@@ -8,22 +8,50 @@ import random
 import re
 import io
 import replicate
-import urllib.request
-import textwrap
 from io import BytesIO
 from utils.logging_config import get_logger
+from utils.error_utils import handle_interaction_error
 from actions.base_job import ReplicateJob
 
 logger = get_logger(__name__)
 
 
+class BaseView(discord.ui.View):
+    """Base view class with error handling for all UI interactions"""
+
+    async def on_error(self, error: Exception, item: discord.ui.Item, interaction: discord.Interaction) -> None:
+        """Handle errors that occur in view interactions"""
+        await handle_interaction_error(
+            error=error,
+            interaction=interaction,
+            context_type="view",
+            context_name=self.__class__.__name__,
+            custom_id=getattr(item, 'custom_id', 'unknown')
+        )
+
+
+class BaseModal(discord.ui.Modal):
+    """Base modal class with error handling"""
+
+    async def on_error(self, error: Exception, interaction: discord.Interaction) -> None:
+        """Handle errors that occur in modal interactions"""
+        await handle_interaction_error(
+            error=error,
+            interaction=interaction,
+            context_type="modal",
+            context_name=self.__class__.__name__,
+            custom_id="N/A"
+        )
+
+
 # View used for SD drawing
-class ComfySDView(discord.ui.View):
+class ComfySDView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
 
         self.add_item(RedrawButton(self, "sd_button_redraw"))
         self.add_item(EditButton(self, "sd_button_edit"))
+        self.add_item(EditImageButton(self, "sd_button_edit_image"))
         self.add_item(VideoButton(self, "sd_button_video"))
         self.add_item(SpoilerButton(self, "sd_button_spoiler"))
         self.add_item(UpscaleButton(self, "sd_button_upscale"))
@@ -32,11 +60,12 @@ class ComfySDView(discord.ui.View):
 
 
 # View used for SDXL drawing
-class ComfySDXLView(discord.ui.View):
+class ComfySDXLView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(RedrawButton(self, "sdxl_button_redraw"))
         self.add_item(EditButton(self, "sdxl_button_edit"))
+        self.add_item(EditImageButton(self, "sdxl_button_edit_image"))
         self.add_item(VideoButton(self, "sdxl_button_video"))
         self.add_item(SpoilerButton(self, "sdxl_button_spoiler"))
         self.add_item(UpscaleButton(self, "sdxl_button_upscale"))
@@ -44,25 +73,34 @@ class ComfySDXLView(discord.ui.View):
         self.add_item(ModelSelect(sdxl_select_models, self, "sdxl_model_select"))
 
 
-# View used for SDXL drawing
-class FluxView(discord.ui.View):
+# View used for Flux drawing
+class FluxView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(FluxEditButton(self, "flux_button_edit"))
         self.add_item(SpoilerButton(self, "flux_button_spoiler"))
         self.add_item(DeleteButton(self, "flux_button_delete"))
 
-# View used for SDXL drawing
-class VideoView(discord.ui.View):
+# View used for video generation
+class VideoView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(SpoilerButton(self, "video_button_spoiler"))
         self.add_item(DeleteButton(self, "video_button_delete"))
 
+# View used for edit images
+class EditView(BaseView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(EditImageButton(self, "edit_button_edit_image"))
+        self.add_item(VideoButton(self, "edit_button_video"))
+        self.add_item(SpoilerButton(self, "edit_button_spoiler"))
+        self.add_item(DeleteButton(self, "edit_button_delete"))
+
 
 
 # View used for upscale
-class UpscaleView(discord.ui.View):
+class UpscaleView(BaseView):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(SpoilerButton(self, "upscale_button_spoiler"))
@@ -70,7 +108,7 @@ class UpscaleView(discord.ui.View):
 
 
 # Edit modal used when clicking one of the pen buttons.
-class EditModal(discord.ui.Modal):
+class EditModal(BaseModal):
     def __init__(self, sd_options: SDOptions, parent_view) -> None:
         super().__init__(title="Edit Prompt")
         self.sd_options = sd_options
@@ -98,7 +136,7 @@ class EditModal(discord.ui.Modal):
         self.sd_options.negative_prompt = self.children[1].value
         await dream_dispatcher(self.sd_options, interaction.followup, interaction.channel, interaction.user, self.parent_view)
 
-class ServerPromptModal(discord.ui.Modal):
+class ServerPromptModal(BaseModal):
     def __init__(self, server_prompt, on_submit) -> None:
         super().__init__(title="Server Prompt")
         self.server_prompt = server_prompt
@@ -118,7 +156,7 @@ class ServerPromptModal(discord.ui.Modal):
         await interaction.response.send_message("Server prompt updated.")
 
 
-class UserPromptModal(discord.ui.Modal):
+class UserPromptModal(BaseModal):
     def __init__(self, user_prompt, on_submit) -> None:
         super().__init__(title="User Prompt")
         self.user_prompt = user_prompt
@@ -139,7 +177,7 @@ class UserPromptModal(discord.ui.Modal):
         await interaction.response.send_message("User prompt updated.")
 
 
-class FluxPromptModal(discord.ui.Modal):
+class FluxPromptModal(BaseModal):
     def __init__(self, prompt) -> None:
         super().__init__(title="Prompt")
         self.prompt = prompt
@@ -180,33 +218,32 @@ class FluxPromptModal(discord.ui.Modal):
 
         # Create and run the job
         job = ReplicateJob(flux_task)
-        output = await job.run()
+        output_files = await job.run()
 
         job_id = add_fluxjob(prompt)
         await followup.delete()
         files = []
-        for idx, url in enumerate(output):
-            with urllib.request.urlopen(url) as response:
-                files.append(
-                    discord.File(
-                        fp=io.BytesIO(response.read()),
-                        filename=f"output-{idx}.png")
-                    )
+        for idx, output_file in enumerate(output_files):
+            files.append(
+                discord.File(
+                    fp=io.BytesIO(await output_file.aread()),
+                    filename=f"output-{idx}.png")
+                )
+        message_lines = [
+            f"{interaction.user.mention} here is your image!",
+            "```",
+            f"{prompt[:1000] + (prompt[1000:] and '...')}",
+            "```",
+            f"Job ID ``{job_id}``"
+        ]
 
         await interaction.channel.send(
-            textwrap.dedent(
-                f"""\
-{interaction.user.mention} here is your image!
-```
-{prompt[:1000] + (prompt[1000:] and '...')}
-```
-Job ID ``{job_id}``
-                """),
+            "\n".join(message_lines),
             files=files,
             view=FluxView()
         )
 
-class VideoPromptModal(discord.ui.Modal):
+class VideoPromptModal(BaseModal):
     def __init__(self, prompt, image: discord.Attachment, resolution: str, orientation: str) -> None:
         super().__init__(title="Prompt")
         self.prompt = prompt
@@ -263,28 +300,94 @@ class VideoPromptModal(discord.ui.Modal):
         # Create and run the job
         job_id = add_videojob(prompt)
         job = ReplicateJob(video_task)
-        output = await job.run()
+        output_file = await job.run()
 
         await followup.delete()
         files = []
-        with urllib.request.urlopen(output) as response:
-            files.append(
-                discord.File(
-                    fp=io.BytesIO(response.read()),
-                    filename=f"output.mp4")
-                )
+        files.append(
+            discord.File(
+                fp=io.BytesIO(await output_file.aread()),
+                filename=f"output.mp4")
+            )
+
+        message_lines = [
+            f"{interaction.user.mention} here is your video!",
+            "```",
+            f"{prompt[:1000] + (prompt[1000:] and '...')}",
+            "```",
+            f"Job ID ``{job_id}``"
+        ]
 
         await interaction.channel.send(
-            textwrap.dedent(
-                f"""\
-{interaction.user.mention} here is your video!
-```
-{prompt[:1000] + (prompt[1000:] and '...')}
-```
-Job ID ``{job_id}``
-                """),
+            "\n".join(message_lines),
             files=files,
             view=VideoView()
+        )
+
+class EditPromptModal(BaseModal):
+    def __init__(self, image: discord.Attachment) -> None:
+        super().__init__(title="Edit Image")
+        self.image = image
+
+        self.add_item(
+            discord.ui.InputText(
+                label="What do you want changed?",
+                value="",
+                required=True,
+                max_length=4000,
+                style=discord.InputTextStyle.long,
+            )
+        )
+
+    async def callback(self, interaction):
+        await interaction.response.defer()
+
+        prompt = self.children[0].value
+        followup = await interaction.followup.send("Request queued. Please Wait.")
+
+        # Capture variables for the closure
+        image = self.image
+
+        # Create a task function for the replicate call
+        async def edit_task():
+            image_bytes = await image.read()
+            output = await replicate.async_run(
+                "google/nano-banana",
+                input={
+                    "prompt": prompt,
+                    "image_input": [BytesIO(image_bytes)],
+                    "output_format": "png"
+                }
+            )
+            return output
+
+        # Create and run the job
+        job_id = add_editjob(prompt, image.url)
+        job = ReplicateJob(edit_task)
+        output_file = await job.run()
+
+        logger.info(output_file.url)
+
+        await followup.delete()
+        files = []
+        files.append(
+            discord.File(
+                fp=io.BytesIO(await output_file.aread()),
+                filename=f"edited-output.png")
+            )
+
+        message_lines = [
+            f"{interaction.user.mention} here is your edited image!",
+            "```",
+            f"{prompt[:1000] + (prompt[1000:] and '...')}",
+            "```",
+            f"Job ID ``{job_id}``"
+        ]
+
+        await interaction.channel.send(
+            "\n".join(message_lines),
+            files=files,
+            view=EditView()
         )
 
 
@@ -361,7 +464,15 @@ class VideoEditButton(discord.ui.Button):
         prompt = get_videojob(job_id)
         await interaction.response.send_modal(VideoPromptModal(prompt))
 
+class EditImageButton(discord.ui.Button):
+    def __init__(self, parent_view, custom_id):
+        super().__init__(custom_id=custom_id, emoji="🔧")
+        self.parent_view = parent_view
 
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            EditPromptModal(interaction.message.attachments[0])
+        )
 
 class RedrawButton(discord.ui.Button):
     def __init__(self, parent_view, custom_id):

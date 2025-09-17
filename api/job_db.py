@@ -14,6 +14,9 @@ def init_db():
     _conn.cursor().execute(
         "CREATE TABLE IF NOT EXISTS videojob (id INTEGER PRIMARY KEY AUTOINCREMENT, prompt TEXT);"
     )
+    _conn.cursor().execute(
+        "CREATE TABLE IF NOT EXISTS editjob (id INTEGER PRIMARY KEY AUTOINCREMENT, prompt TEXT, image_url TEXT);"
+    )
 
 
 def add_job(sd_options: SDOptions):
@@ -53,3 +56,16 @@ def get_videojob(id: str) -> SDOptions:
     c = _conn.cursor()
     c.execute("SELECT prompt FROM videojob WHERE id=?", (id,))
     return c.fetchone()[0]
+
+def add_editjob(prompt: str, image_url: str):
+    c = _conn.cursor()
+    c.execute("INSERT INTO editjob (prompt, image_url) VALUES (?, ?)", (prompt, image_url))
+    _conn.commit()
+
+    return c.lastrowid
+
+def get_editjob(id: str):
+    c = _conn.cursor()
+    c.execute("SELECT prompt, image_url FROM editjob WHERE id=?", (id,))
+    result = c.fetchone()
+    return {"prompt": result[0], "image_url": result[1]}

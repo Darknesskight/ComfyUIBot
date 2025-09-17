@@ -1,0 +1,18 @@
+[project]
+name = "comfyuibot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp[speedups]==3.12.15",
+    "aiosqlite==0.21.0",
+    "jinja2==3.1.6",
+    "openai==1.107.3",
+    "pillow>=11.3.0",
+    "py-cord==2.6.1",
+    "python-dotenv==1.1.1",
+    "replicate==1.0.7",
+    "tiktoken==0.11.0",
+    "websockets==15.0.1",
+]

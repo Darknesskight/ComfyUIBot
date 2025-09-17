@@ -9,7 +9,7 @@ from settings import (
 from .comfy_options import draw_options, default_options
 from api.model_db import upsert_model_default, upsert_sd_default, init_model_db
 from models.sd_options import SDType, SDOptions
-from cogs.view import ComfySDView, ComfySDXLView, FluxPromptModal, VideoPromptModal
+from cogs.view import ComfySDView, ComfySDXLView, FluxPromptModal, VideoPromptModal, EditPromptModal
 from dispatchers.dream_dispatcher import dream_dispatcher
 
 
@@ -151,7 +151,25 @@ class ComfyCog(commands.Cog, name="Stable Diffusion", description="Create images
 
         modal = VideoPromptModal("", image, resolution, orientation)
         await ctx.interaction.response.send_modal(modal)
-        
+
+    @draw.command(name="edit", description="Edit an existing image")
+    @discord.option(
+        "image",
+        type=discord.SlashCommandOptionType.attachment,
+        required=True
+    )
+    async def dream_edit(
+        self,
+        ctx: discord.ApplicationContext,
+        image,
+    ):
+        # Check if Discord detected an image MIME type
+        if not image.content_type or not image.content_type.startswith("image/"):
+            await ctx.respond("Please provide a valid image (PNG, JPG, etc.)", ephemeral=True)
+            return
+
+        modal = EditPromptModal(image)
+        await ctx.interaction.response.send_modal(modal)
 
     @defaults.command(
         name="sd", description="Set defaults for sd models"

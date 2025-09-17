@@ -6,8 +6,9 @@ from api.comfy_api import get_system_info
 from api.websocket_subsystem import start_websocket, stop_websocket
 from api.job_db import init_db
 from api.job_tracker import job_tracker
-from cogs.view import ComfySDView, ComfySDXLView, UpscaleView, FluxView
-from utils.logging_config import setup_logging, get_logger
+from cogs.view import ComfySDView, ComfySDXLView, UpscaleView, FluxView, EditView, VideoView
+from utils.logging_config import setup_logging, get_logger, set_bot_for_alerts
+from utils.error_utils import handle_interaction_error, get_user_friendly_error_message
 
 # Configure logging
 setup_logging()
@@ -21,10 +22,42 @@ class ComfyUIBot(discord.Bot):
         super().__init__(*args, **kwargs)
         self.websocket_started = False
 
+    async def on_application_command_error(self, ctx: discord.ApplicationContext, error: discord.DiscordException):
+        """Global error handler for application commands"""
+        await handle_interaction_error(
+            error=error,
+            interaction=ctx.interaction,
+            context_type="command",
+            context_name=ctx.command.qualified_name if ctx.command else "unknown",
+            custom_id="N/A"
+        )
+
+    async def on_error(self, event_method: str, *args, **kwargs):
+        """Global error handler for other events (interactions, etc.)"""
+        logger.error(f"Error in event {event_method}", exc_info=True)
+
+        # Try to send user-friendly message for interaction errors
+        if event_method == "on_interaction" and args:
+            interaction = args[0]
+            if hasattr(interaction, 'response') and hasattr(interaction, 'user'):
+                try:
+                    error_message = f"{interaction.user.mention} ❌ An unexpected error occurred. Please try again."
+                    if not interaction.response.is_done():
+                        await interaction.response.send_message(error_message)
+                    else:
+                        await interaction.followup.send(error_message)
+                except Exception:
+                    # If we can't send the error message, just log it
+                    pass
+
     async def on_ready(self):
         """Called when the bot is ready"""
         logger.info(f'{self.user} has connected to Discord!')
         logger.info(f'Bot is in {len(self.guilds)} guilds')
+
+        # Initialize Discord alert system with bot instance
+        set_bot_for_alerts(self)
+        logger.info("Discord alert system initialized")
 
         init_db()
 
@@ -32,6 +65,8 @@ class ComfyUIBot(discord.Bot):
         self.add_view(ComfySDXLView())
         self.add_view(UpscaleView())
         self.add_view(FluxView())
+        self.add_view(EditView())
+        self.add_view(VideoView())
         logger.info("Persistent views added")
         
         try:

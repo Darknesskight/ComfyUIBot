@@ -1,8 +1,5 @@
 from discord.ext import commands
 import discord
-import os
-import importlib
-import sys
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -67,6 +64,7 @@ class AdminCog(commands.Cog, name="Admin", description="Admin commands for manag
         except Exception as e:
             logger.error(f"Failed to load cog {cog_path}: {e}")
             await ctx.followup.send(f"❌ Failed to load cog `{cog_path}`: {str(e)}", ephemeral=True)
+            raise
 
     @admin.command(name="unload_cog", description="Unload a cog")
     @commands.is_owner()
@@ -82,7 +80,6 @@ class AdminCog(commands.Cog, name="Admin", description="Admin commands for manag
         await ctx.response.defer()
         
         try:
-            # Check if cog exists
             if cog_name not in self.bot.cogs:
                 await ctx.followup.send(f"Cog `{cog_name}` is not loaded!", ephemeral=True)
                 return
@@ -92,10 +89,8 @@ class AdminCog(commands.Cog, name="Admin", description="Admin commands for manag
                 await ctx.followup.send("❌ Cannot unload the Admin cog!", ephemeral=True)
                 return
             
-            # Get the cog's extension path
-            extension_path = None
-            
             # Find the extension path by checking all extensions
+            extension_path = None
             for ext_name in self.bot.extensions.keys():
                 # Check if the extension contains the cog class
                 try:
@@ -128,7 +123,7 @@ class AdminCog(commands.Cog, name="Admin", description="Admin commands for manag
         autocomplete=get_loaded_cogs
     )
     async def reload_cog(self, ctx: discord.ApplicationContext, extension: str):
-        """Reload a cog (useful for applying changes without restarting the bot)"""
+        """Reload a cog"""
         await ctx.response.defer()
         
         try:
